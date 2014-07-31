@@ -1,9 +1,9 @@
 '''
-Copyright (C) 2013 CG Cookie
+Copyright (C) 2014 CG Cookie
 http://cgcookie.com
 hello@cgcookie.com
 
-Created by Patrick Moore
+Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,13 +20,13 @@ Created by Patrick Moore
 '''
 
 bl_info = {
-    "name": "Contour Retopology Tool",
+    "name": "Polystrips Retopology Tool",
     "description": "A tool to retopologize forms quickly with contour strokes.",
-    "author": "Patrick Moore",
-    "version": (1, 1, 0),
+    "author": "Jonathan Denning, Jonathan Williamson, Patrick Moore",
+    "version": (1, 0, 0),
     "blender": (2, 7, 1),
     "location": "View 3D > Tool Shelf",
-    "warning": '',  # used for warning icon and text in addons panel
+    "warning": 'Beta',  # used for warning icon and text in addons panel
     "wiki_url": "http://cgcookie.com/blender/docs/contour-retopology/",
     "tracker_url": "https://github.com/CGCookie/retopology/issues?labels=Bug&milestone=1&state=open",
     "category": "3D View"}
