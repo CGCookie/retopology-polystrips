@@ -1,9 +1,9 @@
 '''
-Copyright (C) 2013 CG Cookie
+Copyright (C) 2014 CG Cookie
 http://cgcookie.com
 hello@cgcookie.com
 
-Created by Patrick Moore
+Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,18 +27,18 @@ import time
 import copy
 from mathutils import Vector, Quaternion
 from mathutils.geometry import intersect_point_line, intersect_line_plane
-import contour_utilities, general_utilities
+import general_utilities
 from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vector_3d, region_2d_to_location_3d, region_2d_to_origin_3d
 import bmesh
 import blf, bgl
 import itertools
 from polystrips_utilities import *
 from polystrips_draw import *
-from general_utilities import iter_running_sum, dprint, get_object_length_scale, profiler
+from general_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
 import polystrips_utilities
 
 #Make the addon name and location accessible
-AL = general_utilities.AddonLocator()
+AL = AddonLocator()
 
 
 
@@ -321,7 +321,7 @@ class GVert:
             assert False
     
     def update_visibility(self, r3d, update_gedges=False):
-        self.visible = contour_utilities.ray_cast_visible([self.snap_pos], self.obj, r3d)[0]
+        self.visible = general_utilities.ray_cast_visible([self.snap_pos], self.obj, r3d)[0]
         if not update_gedges: return
         for ge in self.get_gedges_notnone():
             ge.update_visibility(r3d)
@@ -555,7 +555,7 @@ class GEdge:
     
     def update_visibility(self, rv3d):
         lp = [gv.snap_pos for gv in self.cache_igverts]
-        lv = contour_utilities.ray_cast_visible(lp, self.obj, rv3d)
+        lv = general_utilities.ray_cast_visible(lp, self.obj, rv3d)
         for gv,v in zip(self.cache_igverts,lv): gv.visible = v
     
     def gverts(self):
@@ -652,7 +652,7 @@ class GEdge:
         i,l = 0,len(self.cache_igverts)
         for gv0,gv1 in zip(self.cache_igverts[:-1],self.cache_igverts[1:]):
             p0,p1 = gv0.position,gv1.position
-            t,d = contour_utilities.closest_t_and_distance_point_to_line_segment(pt, p0,p1)
+            t,d = general_utilities.closest_t_and_distance_point_to_line_segment(pt, p0,p1)
             if min_t < 0 or d < min_d: min_t,min_d = (i+t)/l,d
             i += 1
         return min_t,min_d
@@ -1038,7 +1038,6 @@ class PolyStrips(object):
         # too few samples?
         if len(stroke) <= 1:
             dprint(spc+'Too few samples in stroke (subsample??)')
-            #subsampling function in contour_utils.space_evenly_on_path
             return
         if sgv0 and sgv0==sgv3 and sgv0.count_gedges() >= 3:
             dprint(spc+'cannot connect stroke to same gvert (too many gedges)')

@@ -1,9 +1,9 @@
 '''
-Copyright (C) 2013 CG Cookie
+Copyright (C) 2014 CG Cookie
 http://cgcookie.com
 hello@cgcookie.com
 
-Created by Patrick Moore
+Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,17 +27,21 @@ import time
 import copy
 from mathutils import Vector, Quaternion, Matrix
 from mathutils.geometry import intersect_point_line, intersect_line_plane
-import contour_utilities, general_utilities
 from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vector_3d, region_2d_to_location_3d, region_2d_to_origin_3d
 import bmesh
 import blf
 import bgl
 import itertools
+from general_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
+
+import general_utilities
+import general_drawing
+
 from polystrips_utilities import *
-from general_utilities import iter_running_sum, dprint, get_object_length_scale, profiler
+
 
 #Make the addon name and location accessible
-AL = general_utilities.AddonLocator()
+AL = AddonLocator()
 
 def draw_gedge_text(gedge,context, text):
     l = len(gedge.cache_igverts)

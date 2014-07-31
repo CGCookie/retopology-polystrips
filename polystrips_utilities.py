@@ -1,9 +1,9 @@
 '''
-Copyright (C) 2013 CG Cookie
+Copyright (C) 2014 CG Cookie
 http://cgcookie.com
 hello@cgcookie.com
 
-Created by Patrick Moore
+Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,14 +25,18 @@ import bpy
 import math
 import time
 import copy
+import os
+import sys
 from mathutils import Vector, Quaternion, Matrix
 from mathutils.geometry import intersect_point_line, intersect_line_plane
-import contour_utilities, general_utilities
+import general_utilities
 from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vector_3d, region_2d_to_location_3d, region_2d_to_origin_3d
 import bmesh
 import blf
 import itertools
 from general_utilities import dprint
+
+
 
 def blender_bezier_to_even_points(b_ob, dist):
     
@@ -50,9 +54,9 @@ def blender_bezier_to_even_points(b_ob, dist):
             points = cubic_bezier_points_dist(p0, p1, p2, p3, dist, first=True)
             total_verts.extend(points)
             
-            L = contour_utilities.get_path_length(total_verts)
+            L = general_utilities.get_path_length(total_verts)
             n = round(L/dist)
-            new_verts = contour_utilities.space_evenly_on_path(total_verts, [(0,1),(1,2)], n, 0)
+            new_verts = general_utilities.space_evenly_on_path(total_verts, [(0,1),(1,2)], n, 0)
         paths.append(new_verts)
         
     return(paths)
