@@ -21,7 +21,7 @@ Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
 bl_info = {
     "name": "Polystrips Retopology Tool",
-    "description": "A tool to retopologize forms quickly with contour strokes.",
+    "description": "A tool to retopologize complex forms with drawn strips of polygons.",
     "author": "Jonathan Denning, Jonathan Williamson, Patrick Moore",
     "version": (1, 0, 0),
     "blender": (2, 7, 1),
