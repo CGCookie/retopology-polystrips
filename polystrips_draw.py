@@ -32,10 +32,10 @@ import bmesh
 import blf
 import bgl
 import itertools
-from general_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
 
-import general_utilities
-import general_drawing
+from lib import common_utilities
+from lib import common_drawing
+from lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
 
 from polystrips_utilities import *
 

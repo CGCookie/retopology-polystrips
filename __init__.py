@@ -48,11 +48,11 @@ from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vecto
 from mathutils import Vector, Matrix, Quaternion
 from mathutils.geometry import intersect_line_plane, intersect_point_line
 
-import general_utilities
-from general_utilities import get_object_length_scale, dprint, profiler, frange
-from general_classes import SketchBrush
+from lib import common_utilities
+from lib.common_utilities import get_object_length_scale, dprint, profiler, frange
+from lib.common_classes import SketchBrush
 
-import general_drawing
+from lib import common_drawing
 
 from polystrips import *
 import polystrips_utilities
@@ -145,7 +145,7 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
     def modal(self, context, event):
         ret = self.ui.modal(context, event)
         if 'FINISHED' in ret or 'CANCELLED' in ret:
-            general_utilities.callback_cleanup(self, context)
+            common_utilities.callback_cleanup(self, context)
         return ret
     
     def invoke(self, context, event):
@@ -188,7 +188,7 @@ def unregister():
 
 class PolystripsUI:
     def __init__(self, context, event):
-        settings = general_utilities.get_settings(__file__)
+        settings = common_utilities.get_settings()
         
         self.mode = 'main'
         
@@ -252,7 +252,7 @@ class PolystripsUI:
     # draw functions
     
     def draw_callback(self, context):
-        settings = general_utilities.get_settings(__file__)
+        settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
         new_matrix = [v for l in r3d.view_matrix for v in l]
@@ -276,7 +276,7 @@ class PolystripsUI:
             self.draw_callback_debug(context)
     
     def draw_callback_themed(self, context):
-        settings = general_utilities.get_settings(__file__)
+        settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
         theme_number = 2
@@ -294,8 +294,8 @@ class PolystripsUI:
                 color_fill   = (0.5, 0.5, 0.5, 0.2)
             
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
-                general_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
-                general_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
+                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_SMOOTH")
         
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
@@ -315,12 +315,12 @@ class PolystripsUI:
                 color_fill   = (0.5, 0.5, 0.5, 0.2)
             
             p3d = [p0,p1,p2,p3,p0]
-            general_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
-            general_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
+            common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_SMOOTH")
         
         p3d = [gvert.position for gvert in self.polystrips.gverts if not gvert.is_unconnected() and gvert.is_visible()]
         color = (color_inactive[0]/255.0, color_inactive[1]/255.0, color_inactive[2]/255.0, 1.00)
-        general_drawing.draw_3d_points(context, p3d, color, 4)
+        common_drawing.draw_3d_points(context, p3d, color, 4)
         
         if self.sel_gvert:
             color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
@@ -328,38 +328,38 @@ class PolystripsUI:
             p0 = gv.position
             if gv.is_inner():
                 p1 = gv.gedge_inner.get_outer_gvert_at(gv).position
-                general_drawing.draw_3d_points(context, [p0], color, 8)
-                general_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_3d_points(context, [p0], color, 8)
+                common_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
             else:
                 p3d = [ge.get_inner_gvert_at(gv).position for ge in gv.get_gedges_notnone() if not ge.is_zippered()]
-                general_drawing.draw_3d_points(context, [p0] + p3d, color, 8)
+                common_drawing.draw_3d_points(context, [p0] + p3d, color, 8)
                 for p1 in p3d:
-                    general_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
+                    common_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
         
         if self.sel_gedge:
             color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
             ge = self.sel_gedge
             if self.sel_gedge.is_zippered():
                 p3d = [ge.gvert0.position, ge.gvert3.position]
-                general_drawing.draw_3d_points(context, p3d, color, 8)
+                common_drawing.draw_3d_points(context, p3d, color, 8)
             else:
                 p3d = [gv.position for gv in ge.gverts()]
-                general_drawing.draw_3d_points(context, p3d, color, 8)
-                general_drawing.draw_polyline_from_3dpoints(context, [p3d[0], p3d[1]], color, 2, "GL_LINE_SMOOTH")
-                general_drawing.draw_polyline_from_3dpoints(context, [p3d[2], p3d[3]], color, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_3d_points(context, p3d, color, 8)
+                common_drawing.draw_polyline_from_3dpoints(context, [p3d[0], p3d[1]], color, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p3d[2], p3d[3]], color, 2, "GL_LINE_SMOOTH")
         
         if self.act_gvert:
             color = (color_active[0]/255.0, color_active[1]/255.0, color_active[2]/255.0, 1.00)
             gv = self.act_gvert
             p0 = gv.position
-            general_drawing.draw_3d_points(context, [p0], color, 8)
+            common_drawing.draw_3d_points(context, [p0], color, 8)
         
         if self.mode == 'sketch':
             # draw smoothing line (end of sketch to current mouse position)
-            general_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
             
             # draw sketching stroke
-            general_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
             
             # report pressure reading
             info = str(round(self.sketch_pressure,3))
@@ -370,7 +370,7 @@ class PolystripsUI:
         
         if self.mode in {'scale tool','rotate tool'}:
             # draw a scale/rotate line from tool origin to current mouse position
-            general_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
+            common_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
         
         bgl.glLineWidth(1)
         
@@ -379,23 +379,23 @@ class PolystripsUI:
             self.sketch_brush.draw(context, color=(1,1,1,.5), linewidth=1, color_size=(1,1,1,1))
         else:
             # draw the brush oriented to surface
-            ray,hit = general_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
+            ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
             if hit_idx != -1:
                 mx = self.obj.matrix_world
                 hit_p3d = mx * hit_p3d
-                general_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
+                common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
             if self.mode == 'sketch':
-                ray,hit = general_utilities.ray_cast_region2d(region, r3d, self.sketch[0][0], self.obj, settings)
+                ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.sketch[0][0], self.obj, settings)
                 hit_p3d,hit_norm,hit_idx = hit
                 if hit_idx != -1:
                     mx = self.obj.matrix_world
                     hit_p3d = mx * hit_p3d
-                    general_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
+                    common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
     
     def draw_callback_debug(self, context):
-        settings = general_utilities.get_settings(__file__)
+        settings = common_utilities.get_settings()
         region = context.region
         r3d = context.space_data.region_3d
         
@@ -433,9 +433,9 @@ class PolystripsUI:
         if draw_original_strokes:
             for stroke in self.strokes_original:
                 #p3d = [pt for pt,pr in stroke]
-                #general_drawing.draw_polyline_from_3dpoints(context, p3d, (.7,.7,.7,.8), 3, "GL_LINE_SMOOTH")
-                general_drawing.draw_circle(context, stroke[0][0], Vector((0,0,1)),0.003,(.2,.2,.2,.8))
-                general_drawing.draw_circle(context, stroke[-1][0], Vector((0,1,0)),0.003,(.5,.5,.5,.8))
+                #common_drawing.draw_polyline_from_3dpoints(context, p3d, (.7,.7,.7,.8), 3, "GL_LINE_SMOOTH")
+                common_drawing.draw_circle(context, stroke[0][0], Vector((0,0,1)),0.003,(.2,.2,.2,.8))
+                common_drawing.draw_circle(context, stroke[-1][0], Vector((0,1,0)),0.003,(.5,.5,.5,.8))
         
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
@@ -449,19 +449,19 @@ class PolystripsUI:
                 rs = (gedge.gvert0.radius+gedge.gvert3.radius) * 0.35
                 rl = rs * 0.75
                 p3d = [pm-px*rs,pm+px*rs,pm+px*(rs-rl)+py*rl,pm+px*rs,pm+px*(rs-rl)-py*rl]
-                general_drawing.draw_polyline_from_3dpoints(context, p3d, (0.8,0.8,0.8,0.8),1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, p3d, (0.8,0.8,0.8,0.8),1, "GL_LINE_SMOOTH")
             
             if draw_gedge_bezier:
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
                 p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
-                general_drawing.draw_polyline_from_3dpoints(context, p3d, (0.5,0.5,0.5,0.8),1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, p3d, (0.5,0.5,0.5,0.8),1, "GL_LINE_SMOOTH")
             
             col = color_gedge if len(gedge.cache_igverts) else color_gedge_nocuts
             if gedge.zip_to_gedge: col = color_gedge_zipped
             if gedge == self.sel_gedge: col = sel_fn(col)
             w = 2 if len(gedge.cache_igverts) else 5
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
-                general_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], col, w, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], col, w, "GL_LINE_SMOOTH")
             
             if draw_gedge_index:
                 draw_gedge_text(gedge, context, str(i_ge))
@@ -469,7 +469,7 @@ class PolystripsUI:
             if draw_gedge_igverts:
                 rm = (gedge.gvert0.radius + gedge.gvert3.radius)*0.1
                 for igv in gedge.cache_igverts:
-                    general_drawing.general_drawing.draw_circle(context, igv.position, igv.normal, rm, (1,1,1,.3))
+                    common_drawing.common_drawing.draw_circle(context, igv.position, igv.normal, rm, (1,1,1,.3))
         
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
@@ -487,19 +487,19 @@ class PolystripsUI:
             if gv == self.sel_gvert: col = sel_fn(col)
             
             p3d = [p0,p1,p2,p3,p0]
-            general_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
             
             if draw_gvert_orientations:
                 p,x,y = gv.snap_pos,gv.snap_tanx,gv.snap_tany
-                general_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.005], (1,0,0,1), 1, "GL_LINE_SMOOTH")
-                general_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.005], (0,1,0,1), 1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.005], (1,0,0,1), 1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.005], (0,1,0,1), 1, "GL_LINE_SMOOTH")
         
         if draw_gvert_unsnapped:
             for gv in self.polystrips.gverts:
                 p,x,y,n = gv.position,gv.snap_tanx,gv.snap_tany,gv.snap_norm
-                general_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.01], (1,0,0,1), 1, "GL_LINE_SMOOTH")
-                general_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.01], (0,1,0,1), 1, "GL_LINE_SMOOTH")
-                general_drawing.draw_polyline_from_3dpoints(context, [p,p+n*0.01], (0,0,1,1), 1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.01], (1,0,0,1), 1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.01], (0,1,0,1), 1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [p,p+n*0.01], (0,0,1,1), 1, "GL_LINE_SMOOTH")
         
         if self.sel_gedge:
             if not self.sel_gedge.zip_to_gedge:
@@ -508,7 +508,7 @@ class PolystripsUI:
                     if not gv.is_visible(): continue
                     p0,p1,p2,p3 = gv.get_corners()
                     p3d = [p0,p1,p2,p3,p0]
-                    general_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
+                    common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
             draw_gedge_info(self.sel_gedge, context)
         
         if self.sel_gvert:
@@ -519,11 +519,11 @@ class PolystripsUI:
                 if not gv.is_visible(): continue
                 p0,p1,p2,p3 = gv.get_corners()
                 p3d = [p0,p1,p2,p3,p0]
-                general_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
         
         if self.mode == 'sketch':
-            general_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
-            general_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
             
             info = str(round(self.sketch_pressure,3))
             ''' draw text '''
@@ -534,17 +534,17 @@ class PolystripsUI:
         
             
         if self.mode in {'scale tool','rotate tool'}:
-            general_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
+            common_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
         
         bgl.glLineWidth(1)
         
         if self.mode != 'brush scale tool':
-            ray,hit = general_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
+            ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
             if hit_idx != -1:
                 mx = self.obj.matrix_world
                 hit_p3d = mx * hit_p3d
-                general_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
+                common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
         self.sketch_brush.draw(context)
     
@@ -874,7 +874,7 @@ class PolystripsUI:
         
         if eventd['press'] == 'RIGHTMOUSE':                                         # picking
             x,y = eventd['mouse']
-            pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+            pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
             if not pts:
                 self.sel_gvert,self.sel_gedge,self.act_gvert = None,None,None
                 return ''
@@ -930,7 +930,7 @@ class PolystripsUI:
             
             if eventd['press'] == 'K':
                 x,y = eventd['mouse']
-                pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
@@ -965,7 +965,7 @@ class PolystripsUI:
                     return ''
                 
                 x,y = eventd['mouse']
-                pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
@@ -1007,7 +1007,7 @@ class PolystripsUI:
                     print('Selected GVert must be endpoint (exactly one GEdge)')
                     return ''
                 x,y = eventd['mouse']
-                pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
@@ -1074,7 +1074,7 @@ class PolystripsUI:
                 # self.sel_gvert = None
                 # return ''
                 x,y = eventd['mouse']
-                pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
@@ -1087,7 +1087,7 @@ class PolystripsUI:
             
             if eventd['press'] == 'M':
                 x,y = eventd['mouse']
-                pts = general_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
@@ -1150,7 +1150,7 @@ class PolystripsUI:
             if self.sketch[-1][1] == 0:
                 self.sketch[-1] = self.sketch[-2]
                 
-            p3d = general_utilities.ray_cast_stroke(eventd['context'], self.obj, self.sketch) if len(self.sketch) > 1 else []
+            p3d = common_utilities.ray_cast_stroke(eventd['context'], self.obj, self.sketch) if len(self.sketch) > 1 else []
             if len(p3d) <= 1: return 'main'
             
             # tessellate stroke (if needed) so we have good stroke sampling
@@ -1271,7 +1271,7 @@ class PolystripsUI:
     
     def modal(self, context, event):
         context.area.tag_redraw()
-        settings = general_utilities.get_settings(__file__)
+        settings = common_utilities.get_settings()
         
         eventd = self.get_event_details(context, event)
         
