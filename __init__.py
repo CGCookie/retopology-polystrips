@@ -20,16 +20,17 @@ Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 '''
 
 bl_info = {
-    "name": "Polystrips Retopology Tool",
+    "name":        "Polystrips Retopology Tool",
     "description": "A tool to retopologize complex forms with drawn strips of polygons.",
-    "author": "Jonathan Denning, Jonathan Williamson, Patrick Moore",
-    "version": (1, 0, 0),
-    "blender": (2, 7, 1),
-    "location": "View 3D > Tool Shelf",
-    "warning": 'Beta',  # used for warning icon and text in addons panel
-    "wiki_url": "http://cgcookie.com/blender/docs/contour-retopology/",
+    "author":      "Jonathan Denning, Jonathan Williamson, Patrick Moore",
+    "version":     (1, 0, 0),
+    "blender":     (2, 7, 1),
+    "location":    "View 3D > Tool Shelf",
+    "warning":     "Beta",  # used for warning icon and text in addons panel
+    "wiki_url":    "http://cgcookie.com/blender/docs/contour-retopology/",
     "tracker_url": "https://github.com/CGCookie/retopology-polystrips/issues",
-    "category": "3D View"}
+    "category":    "3D View"
+    }
 
 # Add the current __file__ path to the search path
 import sys, os
@@ -98,6 +99,9 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         
         row = layout.row(align=True)
         row.prop(self, "theme")
+        
+        row = layout.row(align=True)
+        row.prop(self, "debug")
 
 
 
