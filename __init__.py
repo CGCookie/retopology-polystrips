@@ -66,6 +66,10 @@ polystrips_keymaps = []
 class PolystripsToolsAddonPreferences(AddonPreferences):
     bl_idname = __name__
     
+    def update_theme(self, context):
+        print('theme updated to ' + str(theme))
+        
+    
     debug = IntProperty(
             name="Debug Level",
             default=1,
@@ -279,7 +283,7 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
-        theme_number = 2
+        theme_number = settings.theme
         
         color_inactive  = (0,0,0)
         color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
