@@ -37,8 +37,8 @@ from mathutils import Vector, Matrix, Quaternion
 
 
 class AddonLocator(object):
-    def __init__(self):
-        self.fullInitPath = __file__
+    def __init__(self, f=None):
+        self.fullInitPath = f if f else __file__
         self.FolderPath = os.path.dirname(self.fullInitPath)
         self.FolderName = os.path.basename(self.FolderPath)
     
@@ -46,7 +46,11 @@ class AddonLocator(object):
         sys.path.append(self.FolderPath)
         print("Addon path has been registered into system path for this session")
 
-
+def get_settings(f):
+    folder_path = os.path.dirname(f)
+    folder_name = os.path.basename(folder_path)
+    settings = bpy.context.user_preferences.addons[folder_name].preferences
+    return settings
 
 def dprint(s, l=2):
     AL = AddonLocator()

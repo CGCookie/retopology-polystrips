@@ -59,12 +59,8 @@ import polystrips_utilities
 from polystrips_draw import *
 
 
-# Create a class that contains all location information for addons
-AL = general_utilities.AddonLocator()
-
-
 # Used to store keymaps for addon
-addon_keymaps = []
+polystrips_keymaps = []
 
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
@@ -175,7 +171,7 @@ def register():
     kmi = km.keymap_items.new('wm.call_menu', 'V', 'PRESS', ctrl=True, shift=True)
     kmi.properties.name = 'object.retopology_menu' 
     kmi.active = True
-    addon_keymaps.append((km, kmi))
+    polystrips_keymaps.append((km, kmi))
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
@@ -183,16 +179,16 @@ def unregister():
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
     
     # Remove addon hotkeys
-    for km, kmi in addon_keymaps:
+    for km, kmi in polystrips_keymaps:
         km.keymap_items.remove(kmi)
-    addon_keymaps.clear()
+    polystrips_keymaps.clear()
 
 
 
 
 class PolystripsUI:
     def __init__(self, context, event):
-        settings = context.user_preferences.addons[AL.FolderName].preferences
+        settings = general_utilities.get_settings(__file__)
         
         self.mode = 'main'
         
@@ -256,7 +252,7 @@ class PolystripsUI:
     # draw functions
     
     def draw_callback(self, context):
-        settings = context.user_preferences.addons[AL.FolderName].preferences
+        settings = general_utilities.get_settings(__file__)
         region,r3d = context.region,context.space_data.region_3d
         
         new_matrix = [v for l in r3d.view_matrix for v in l]
@@ -280,7 +276,7 @@ class PolystripsUI:
             self.draw_callback_debug(context)
     
     def draw_callback_themed(self, context):
-        settings = context.user_preferences.addons[AL.FolderName].preferences
+        settings = general_utilities.get_settings(__file__)
         region,r3d = context.region,context.space_data.region_3d
         
         theme_number = 2
@@ -399,7 +395,7 @@ class PolystripsUI:
         
     
     def draw_callback_debug(self, context):
-        settings = context.user_preferences.addons[AL.FolderName].preferences
+        settings = general_utilities.get_settings(__file__)
         region = context.region
         r3d = context.space_data.region_3d
         
@@ -1275,7 +1271,7 @@ class PolystripsUI:
     
     def modal(self, context, event):
         context.area.tag_redraw()
-        settings = context.user_preferences.addons[AL.FolderName].preferences
+        settings = general_utilities.get_settings(__file__)
         
         eventd = self.get_event_details(context, event)
         
