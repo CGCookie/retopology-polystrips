@@ -289,7 +289,7 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
-        theme_number = int(settings.theme)
+        theme_number = 2 # int(settings.theme)
         
         color_inactive  = (0,0,0)
         color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
