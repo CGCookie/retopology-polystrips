@@ -77,12 +77,14 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
             max = 4,
             )
     
-    theme = IntProperty(
-        name='Theme',
-        description='Color theme to use',
-        default=2,
-        min=0,
-        max=2
+    theme = EnumProperty(
+        items=[
+            ('0','blue','blue'),
+            ('1','light orange','light orange'),
+            ('2','orange','orange')
+            ],
+        name='theme',
+        default='2'
         )
     
     quad_prev_radius = IntProperty(
@@ -283,7 +285,7 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
-        theme_number = settings.theme
+        theme_number = int(settings.theme)
         
         color_inactive  = (0,0,0)
         color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
