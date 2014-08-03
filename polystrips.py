@@ -1529,12 +1529,14 @@ class PolyStrips(object):
         '''
         merge gvert0 into gvert1
         '''
-        for ge in gvert0.get_gedges_notnone():
+        l_ge = gvert0.get_gedges_notnone()
+        for ge in l_ge:
             l_gv = [gvert1 if gv==gvert0 else gv for gv in ge.gverts()]
             self.disconnect_gedge(ge)
             self.create_gedge(*l_gv)
         self.gverts = [gv for gv in self.gverts if gv!=gvert0]
         gvert1.update_gedges()
+        return gvert1
 
 
 

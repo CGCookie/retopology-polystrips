@@ -705,7 +705,7 @@ class PolystripsUI:
         else:
             dx,dy = command
             for gv,up in self.tool_data:
-                gv.position += (self.tool_x*dx + self.tool_y*dy)*self.length_scale / 1000
+                gv.position += (self.tool_x*dx + self.tool_y*dy)*self.sel_gvert.radius / 2
                 gv.update()
     
     def grab_tool_gedge(self, command, eventd):
@@ -1030,6 +1030,8 @@ class PolystripsUI:
                 return ''
             
             if eventd['press'] == 'X':
+                if self.sel_gvert.is_inner():
+                    return ''
                 self.polystrips.disconnect_gvert(self.sel_gvert)
                 self.sel_gvert = None
                 self.polystrips.remove_unconnected_gverts()
@@ -1096,17 +1098,19 @@ class PolystripsUI:
                 return ''
             
             if eventd['press'] == 'M':
+                if self.sel_gvert.is_inner(): return ''
                 x,y = eventd['mouse']
                 pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
                     return ''
                 pt = pts[0]
                 for gv in self.polystrips.gverts:
-                    if not gv.is_picked(pt): continue
+                    if gv.is_inner() or not gv.is_picked(pt) or gv == self.sel_gvert: continue
                     if len(self.sel_gvert.get_gedges_notnone()) + len(gv.get_gedges_notnone()) > 4:
-                        print('Too many connected GEdges for merge!')
+                        dprint('Too many connected GEdges for merge!')
                         continue
                     self.polystrips.merge_gverts(self.sel_gvert, gv)
+                    self.sel_gvert = gv
                     return ''
                 return ''
                 
