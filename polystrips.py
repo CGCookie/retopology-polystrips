@@ -233,17 +233,20 @@ class GVert:
         pr = profiler.start()
         
         mx = self.obj.matrix_world
+        mxnorm = mx.transposed().inverted().to_3x3()
         mx3x3 = mx.to_3x3()
         imx = mx.inverted()
         
         l,n,i = self.obj.closest_point_on_mesh(imx*self.position)
-        self.snap_pos  = mx * l
-        self.snap_norm = (mx3x3 * n).normalized()
+        self.snap_norm = (mxnorm * n).normalized()
         self.snap_tanx = self.tangent_x.normalized()
         self.snap_tany = self.snap_norm.cross(self.snap_tanx).normalized()
         
         if not self.is_unconnected() or True:
+            self.snap_pos  = mx * l
             self.position = self.snap_pos
+        else:
+            self.snap_pos = self.position
         # NOTE! DO NOT UPDATE NORMAL, TANGENT_X, AND TANGENT_Y
         
         if do_edges:
@@ -879,14 +882,19 @@ class GEdge:
         snaps already computed igverts to surface of object ob
         '''
         mx = self.obj.matrix_world
+        mxnorm = mx.transposed().inverted().to_3x3()
         mx3x3 = mx.to_3x3()
         imx = mx.inverted()
         
         for igv in self.cache_igverts:
             l,n,i = self.obj.closest_point_on_mesh(imx * igv.position)
             igv.position = mx * l
-            igv.normal = (mx3x3 * n).normalized()
+            igv.normal = (mxnorm * n).normalized()
             igv.tangent_y = igv.normal.cross(igv.tangent_x).normalized()
+            igv.snap_pos = igv.position
+            igv.snap_norm = igv.normal
+            igv.snap_tanx = igv.tangent_x
+            igv.snap_tany = igv.tangent_y
         
     
     def is_picked(self, pt):
@@ -1052,7 +1060,7 @@ class PolyStrips(object):
         threshold_splitdist    = (r0+r3)/2 / 2
         
         tot_length = sum((s0[0]-s1[0]).length for s0,s1 in zip(stroke[:-1],stroke[1:]))
-        dprint(spc+'stroke len: %f' % tot_length)
+        dprint(spc+'stroke len: %f; sgv0: %s; sgv3: %s' % (tot_length,'t' if sgv0 else 'f', 't' if sgv3 else 'f'))
         if tot_length < threshold_tooshort and not (sgv0 and sgv3):
             dprint(spc+'Stroke too short (%f)' % tot_length)
             return

@@ -306,6 +306,12 @@ class PolystripsUI:
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
                 common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_SMOOTH")
+            
+            if False:
+                # draw bezier
+                p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
+                p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
+                common_drawing.draw_polyline_from_3dpoints(context, p3d, (1,1,1,0.5),1, "GL_LINE_SMOOTH")
         
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
