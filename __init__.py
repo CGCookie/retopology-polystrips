@@ -387,7 +387,7 @@ class PolystripsUI:
         if self.mode == 'brush scale tool':
             # scaling brush size
             self.sketch_brush.draw(context, color=(1,1,1,.5), linewidth=1, color_size=(1,1,1,1))
-        else:
+        elif self.mode not in {'grab tool','scale tool','rotate tool'}:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
@@ -548,7 +548,7 @@ class PolystripsUI:
         
         bgl.glLineWidth(1)
         
-        if self.mode != 'brush scale tool':
+        if self.mode not in {'grab tool','scale tool','rotate tool','brush scale tool'}:
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
             if hit_idx != -1:
@@ -691,21 +691,33 @@ class PolystripsUI:
             self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
     
     def grab_tool_gvert_neighbors(self, command, eventd):
+        '''
+        translates selected gvert and neighbors
+        note: translation is relative to selected gvert
+        '''
+        def l3dr2d(p):
+            return location_3d_to_region_2d(eventd['region'], eventd['r3d'], p)
         if command == 'init':
             self.footer = 'Translating GVerts positions'
             sgv = self.sel_gvert
-            lgv = [ge.gvert1 if ge.gvert0==sgv else ge.gvert2 for ge in sgv.get_gedges() if ge]
-            self.tool_data = [(sgv,sgv.position)] + [(gv,Vector(gv.position)) for gv in lgv]
+            s2d = l3dr2d(sgv.position)
+            lgv = [ge.get_inner_gvert_at(sgv) for ge in sgv.get_gedges_notnone()]
+            self.tool_data = [(sgv, Vector(sgv.position), Vector((0,0)))]
+            self.tool_data += [(gv, Vector(gv.position), l3dr2d(gv.position)-s2d) for gv in lgv]
         elif command == 'commit':
             pass
         elif command == 'undo':
-            for gv,p in self.tool_data:
+            for gv,p,relp in self.tool_data:
                 gv.position = p
                 gv.update()
         else:
-            dx,dy = command
-            for gv,up in self.tool_data:
-                gv.position += (self.tool_x*dx + self.tool_y*dy)*self.sel_gvert.radius / 2
+            dv = Vector(command) * (2 if eventd['shift'] else 8)
+            s2d = l3dr2d(self.sel_gvert.position)
+            for gv,up,relp in self.tool_data:
+                gv2d = s2d+relp+dv
+                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [gv2d])
+                if not pts: return ''
+                gv.position = pts[0]
                 gv.update()
     
     def grab_tool_gedge(self, command, eventd):
