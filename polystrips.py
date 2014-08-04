@@ -825,6 +825,7 @@ class GEdge:
                     c = ctest
             if c <= 1:
                 self.cache_igverts = []
+                self.n_quads = 3
                 return
     
             # compute difference for smoothly interpolating radii
@@ -854,6 +855,8 @@ class GEdge:
         self.cache_igverts = [GVert(self.obj,self.length_scale,p,r,n,tx,ty) for p,r,n,tx,ty in zip(l_pos,l_radii,l_norms,l_tanx,l_tany)]
         if not self.force_count:
             self.n_quads = int((len(self.cache_igverts)+1)/2)
+            
+        
         self.snap_igverts()
         
         self.gvert0.update(do_edges=False)

@@ -976,7 +976,7 @@ class PolystripsUI:
             
             if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'DOWN_ARROW'}:
                 print('decrease quads')
-                if self.sel_gedge.n_quads > 4:
+                if self.sel_gedge.n_quads > 3:
                     self.sel_gedge.n_quads -= 1
                     self.sel_gedge.force_count = True
                     self.sel_gedge.update()
