@@ -673,71 +673,66 @@ class PolystripsUI:
             m = command
             self.stroke_radius *= m
     
-    def grab_tool_gvert(self, command, eventd):
+    def grab_tool_gvert_list(self, command, eventd, lgv):
+        '''
+        translates list of gverts
+        note: translation is relative to first gvert
+        '''
+        def l3dr2d(p): return location_3d_to_region_2d(eventd['region'], eventd['r3d'], p)
+        
         if command == 'init':
-            self.footer = 'Translating GVert position'
-            self.tool_data = self.sel_gvert.position
+            self.footer = 'Translating GVert position(s)'
+            s2d = l3dr2d(lgv[0].position)
+            self.tool_data = [(gv, Vector(gv.position), l3dr2d(gv.position)-s2d) for gv in lgv]
         elif command == 'commit':
-            self.sel_gvert.update_gedges()
             pass
         elif command == 'undo':
-            self.sel_gvert.position = self.tool_data
-            self.sel_gvert.update()
-            self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
+            for gv,p,_ in self.tool_data: gv.position = p
+            for gv,_,_ in self.tool_data:
+                gv.update()
+                gv.update_visibility(eventd['r3d'], update_gedges=True)
         else:
-            dx,dy = command
-            self.sel_gvert.position += (self.tool_x*dx + self.tool_y*dy) * self.sel_gvert.radius / 2
-            self.sel_gvert.update()
-            self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
+            dv = Vector(command) * (2 if eventd['shift'] else 8)
+            s2d = l3dr2d(self.tool_data[0][0].position)
+            lgv2d = [s2d+relp+dv for _,_,relp in self.tool_data]
+            pts = common_utilities.ray_cast_path(eventd['context'], self.obj, lgv2d)
+            if len(pts) != len(lgv2d): return ''
+            for d,p2d in zip(self.tool_data, pts):
+                d[0].position = p2d
+            for gv,_,_ in self.tool_data:
+                gv.update()
+                gv.update_visibility(eventd['r3d'], update_gedges=True)
+        
+    def grab_tool_gvert(self, command, eventd):
+        '''
+        translates selected gvert
+        '''
+        if command == 'init':
+            lgv = [self.sel_gvert]
+        else:
+            lgv = None
+        self.grab_tool_gvert_list(command, eventd, lgv)
     
     def grab_tool_gvert_neighbors(self, command, eventd):
         '''
-        translates selected gvert and neighbors
+        translates selected gvert and its neighbors
         note: translation is relative to selected gvert
         '''
-        def l3dr2d(p):
-            return location_3d_to_region_2d(eventd['region'], eventd['r3d'], p)
         if command == 'init':
-            self.footer = 'Translating GVerts positions'
             sgv = self.sel_gvert
-            s2d = l3dr2d(sgv.position)
-            lgv = [ge.get_inner_gvert_at(sgv) for ge in sgv.get_gedges_notnone()]
-            self.tool_data = [(sgv, Vector(sgv.position), Vector((0,0)))]
-            self.tool_data += [(gv, Vector(gv.position), l3dr2d(gv.position)-s2d) for gv in lgv]
-        elif command == 'commit':
-            pass
-        elif command == 'undo':
-            for gv,p,relp in self.tool_data:
-                gv.position = p
-                gv.update()
+            lgv = [sgv] + [ge.get_inner_gvert_at(sgv) for ge in sgv.get_gedges_notnone()]
         else:
-            dv = Vector(command) * (2 if eventd['shift'] else 8)
-            s2d = l3dr2d(self.sel_gvert.position)
-            for gv,up,relp in self.tool_data:
-                gv2d = s2d+relp+dv
-                pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [gv2d])
-                if not pts: return ''
-                gv.position = pts[0]
-                gv.update()
+            lgv = None
+        self.grab_tool_gvert_list(command, eventd, lgv)
     
     def grab_tool_gedge(self, command, eventd):
         if command == 'init':
-            self.footer = 'Translating GEdge positions'
             sge = self.sel_gedge
             lgv = [sge.gvert0, sge.gvert3]
             lgv += [ge.get_inner_gvert_at(gv) for gv in lgv for ge in gv.get_gedges_notnone()]
-            self.tool_data = [(gv,Vector(gv.position)) for gv in lgv]
-        elif command == 'commit':
-            pass
-        elif command == 'undo':
-            for gv,p in self.tool_data:
-                gv.position = p
-                gv.update()
         else:
-            dx,dy = command
-            for gv,up in self.tool_data:
-                gv.position += (self.tool_x*dx + self.tool_y*dy)*self.length_scale / 1000
-                gv.update()
+            lgv = None
+        self.grab_tool_gvert_list(command, eventd, lgv)
     
     def rotate_tool_gvert_neighbors(self, command, eventd):
         if command == 'init':
@@ -1229,11 +1224,11 @@ class PolystripsUI:
         px,py = self.mode_pos
         sx,sy = self.mode_start
         
-        if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE'}:
+        if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE','SHIFT+RET','SHIFT+NUMPAD_ENTER','SHIFT+LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
             return 'main'
         
-        if eventd['press'] in {'ESC', 'RIGHTMOUSE'}:
+        if eventd['press'] in {'ESC','RIGHTMOUSE'}:
             self.tool_fn('undo', eventd)
             return 'main'
         
