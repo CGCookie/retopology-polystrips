@@ -275,13 +275,12 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         repeated_actions = {'count','zip count'}
         
-        if action in repeated_actions and len(polystrips_undo_cahce):
+        if action in repeated_actions and len(polystrips_undo_cache):
             if action == polystrips_undo_cache[-1][1]:
                 print('repeatable...dont take snapshot')
                 return
         
-        gv_data = copy.deepcopy(self.polystrips.gverts)
-        ge_data = copy.deepcopy(self.polystrips.gedges)
+        p_data = copy.deepcopy(self.polystrips)
         
         if self.sel_gedge:
             sel_gedge = self.polystrips.gedges.index(self.sel_gedge)
@@ -298,7 +297,7 @@ class PolystripsUI:
         else:
             act_gvert = None
             
-        polystrips_undo_cache.append(([gv_data, ge_data, sel_gvert, sel_gedge, act_gvert], action))
+        polystrips_undo_cache.append(([p_data, sel_gvert, sel_gedge, act_gvert], action))
             
         if len(polystrips_undo_cache) > settings.undo_depth:
             polystrips_undo_cache.pop(0)
@@ -310,22 +309,20 @@ class PolystripsUI:
         if len(polystrips_undo_cache) > 0:
             data, action = polystrips_undo_cache.pop()
             
-            self.polystrips.gverts = data[0]
-            self.polystrips.gedges = data[1]
+            self.polystrips = data[0]
             
-            
+            if data[1]:
+                self.sel_gvert = self.polystrips.gverts[data[1]]
+            else:
+                self.sel_gvert = None
+                
             if data[2]:
                 self.sel_gedge = self.polystrips.gedges[data[2]]
             else:
                 self.sel_gedge = None
                 
             if data[3]:
-                self.sel_gvert = self.polystrips.gverts[data[3]]
-            else:
-                self.sel_gvert = None
-                
-            if data[4]:
-                self.act_gvert = self.polystrips.gedges[data[4]]
+                self.act_gvert = self.polystrips.gverts[data[3]]
             else:
                 self.act_gvert = None
                 
