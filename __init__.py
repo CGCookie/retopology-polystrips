@@ -399,14 +399,18 @@ class PolystripsUI:
             hit_p3d,hit_norm,hit_idx = hit
             if hit_idx != -1:
                 mx = self.obj.matrix_world
+                mxnorm = mx.transposed().inverted().to_3x3()
                 hit_p3d = mx * hit_p3d
+                hit_norm = mxnorm * hit_norm
                 common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
             if self.mode == 'sketch':
                 ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.sketch[0][0], self.obj, settings)
                 hit_p3d,hit_norm,hit_idx = hit
                 if hit_idx != -1:
                     mx = self.obj.matrix_world
+                    mxnorm = mx.transposed().inverted().to_3x3()
                     hit_p3d = mx * hit_p3d
+                    hit_norm = mxnorm * hit_norm
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
     
