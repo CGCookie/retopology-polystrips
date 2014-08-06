@@ -308,6 +308,13 @@ def cubic_bezier_fit_value(l_v, l_t):
     return (err,v0,v1,v2,v3)
 
 def cubic_bezier_fit_points(l_co, error_scale, depth=0, t0=0, t3=1, allow_split=True, force_split=False):
+    '''
+    fits cubic bezier to given points
+    returns list of tuples of (t0,t3,p0,p1,p2,p3)
+    that best fits the given points l_co
+    where t0 and t3 are the passed-in t0 and t3
+    and p0,p1,p2,p3 are the control points of bezier
+    '''
     assert l_co
     if len(l_co)<3:
         p0,p3 = l_co[0],l_co[-1]

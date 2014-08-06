@@ -775,6 +775,23 @@ class GEdge:
         r0,r1,r2,r3 = self.get_radii()
         n0,n1,n2,n3 = self.get_normals()
         
+        if False:
+            # attempting to smooth snapped igverts
+            mx     = self.obj.matrix_world
+            mxnorm = mx.transposed().inverted().to_3x3()
+            mx3x3  = mx.to_3x3()
+            imx    = mx.inverted()
+            p3d      = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
+            snap     = [self.obj.closest_point_on_mesh(imx*p) for p in p3d]
+            snap_pos = [mx*pos for pos,norm,idx in snap]
+            bez = cubic_bezier_fit_points(snap_pos, min(r0,r3)/20, allow_split=False)
+            if bez:
+                _,_,p0,p1,p2,p3 = bez[0]
+                _,n1,_ = self.obj.closest_point_on_mesh(imx*p1)
+                _,n2,_ = self.obj.closest_point_on_mesh(imx*p2)
+                n1 = mxnorm*n1
+                n2 = mxnorm*n2
+        
         #get s_t_map
         if self.n_quads:
             step = 20* self.n_quads
@@ -785,35 +802,27 @@ class GEdge:
         
         #l = self.get_length()  <-this is more accurate, but we need consistency
         l = max(s_t_map)
+        
         if self.force_count and self.n_quads:
-
-            #number of segments
+            # force number of segments
+            
+            # number of segments
             c = 2 * (self.n_quads - 1)
+            
             # compute difference for smoothly interpolating radii perpendicular to GEdge
-            s = (r3-r0) / float(c+1)  #(c-1?) c+1 verts inexed 0 to c.  f(n) = r0 + s * n ;f(0) = r0 f(c) = r3  = ro + c * s
+            s = (r3-r0) / float(c+1)
             
-            #method 1, leave end quads with R0 and R3 preserved
-            #average width of GEdges internal quads
-            #davg = (l - r0 - r3)/(2 * (self.n_quads - 2)) #what if davg is negative?
-            # compute interval lengths, ts, blend weights leaving end quads radius same
-            #l_widths = [0] + [r0] + [davg for i in range(1,c-1)] + [r3]
-            
-            #method 2
             L = c * r0 +  s*(c+1)*c/2  #integer run sum
             os = L - l
             d_os = os/c
             
-            # compute interval lengths, ts, blend weights
+            # compute interval lengths and ts
             l_widths = [0] + [r0 + s*i - d_os for i in range(c)]
-
-            #l_ts = [float(i)/float(c) for i in range(c+1)]  #pure time distribution
-            #l_ts1 = [dist/l for w,dist in iter_running_sum(l_widths)]  #assume constant velocity on curve
             l_ts = [polystrips_utilities.closest_t_of_s(s_t_map, dist) for w,dist in iter_running_sum(l_widths)]  #pure lenght distribution
-
-            l_weights = [cubic_bezier_weights(t) for t in l_ts]
         
         else:
-            # find "optimal" count for subdividing spline
+            # find "optimal" count for subdividing spline based on radii of two endpoints
+            
             cmin,cmax = int(math.floor(l/max(r0,r3))),int(math.floor(l/min(r0,r3)))
             
             c = 0
@@ -828,7 +837,7 @@ class GEdge:
                 self.cache_igverts = []
                 self.n_quads = 3
                 return
-    
+            
             # compute difference for smoothly interpolating radii
             s = (r3-r0) / float(c-1)
             
@@ -840,15 +849,14 @@ class GEdge:
             # compute interval lengths, ts, blend weights
             l_widths = [0] + [r0+oc+i*s for i in range(c+1)]
             l_ts = [p/l for w,p in iter_running_sum(l_widths)]
-            l_weights = [cubic_bezier_weights(t) for t in l_ts]
         
         # compute interval pos, rad, norm, tangent x, tangent y
-        l_pos   = [cubic_bezier_blend_weights(p0,p1,p2,p3,weights) for weights in l_weights]
+        l_pos   = [cubic_bezier_blend_t(p0,p1,p2,p3,t) for t in l_ts]
         l_radii = [r0 + i*s for i in range(c+2)]
         
         #Verify smooth radius interpolation
         #print('R0 %f, R3 %f, r0 %f, r3 %f ' % (r0,r3,l_radii[0],l_radii[-1]))
-        l_norms = [cubic_bezier_blend_weights(n0,n1,n2,n3,weights).normalized() for weights in l_weights]
+        l_norms = [cubic_bezier_blend_t(n0,n1,n2,n3,t).normalized() for t in l_ts]
         l_tanx  = [cubic_bezier_derivative(p0,p1,p2,p3,t).normalized() for t in l_ts]
         l_tany  = [t.cross(n).normalized() for t,n in zip(l_tanx,l_norms)]
         
