@@ -223,15 +223,29 @@ class PolystripsUI:
         
         self.stroke_smoothing = 0.5          # 0: no smoothing. 1: no change
         
-        self.obj = context.object
-        self.scale = self.obj.scale[0]
-        self.length_scale = get_object_length_scale(self.obj)
+        if context.mode == 'OBJECT':
+            self.obj = context.object
+
+            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.me.update()
+            self.bme = bmesh.new()
+            self.bme.from_mesh(self.me)
+            
+            self.to_obj = None
+            self.to_bme = None
+            
+        if context.mode == 'EDIT_MESH':
+            self.obj = [ob for ob in context.selected_objects if ob != context.object][0]
+            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.me.update()
+            self.bme = bmesh.new()
+            self.bme.from_mesh(self.me)
+            
+            self.to_obj = context.object
+            self.to_bme = bmesh.from_edit_mesh(context.object.data)
         
-        self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
-        self.me.update()
-        self.bme = bmesh.new()
-        self.bme.from_mesh(self.me)
-        
+        self.scale = self.obj.scale[0]    
+        self.length_scale = get_object_length_scale(self.obj)    
         #world stroke radius
         self.stroke_radius = 0.01 * self.length_scale
         self.stroke_radius_pressure = 0.01 * self.length_scale
@@ -564,27 +578,49 @@ class PolystripsUI:
     
     def create_mesh(self, context):
         verts,quads = self.polystrips.create_mesh()
-        bm = bmesh.new()
-        for v in verts: bm.verts.new(v)
-        for q in quads: bm.faces.new([bm.verts[i] for i in q])
         
-        nm_polystrips = self.obj.name + "_polystrips"
+        if self.to_bme and self.to_obj:  #EDIT MDOE on Existing Mesh
+            bm = self.to_bme
+            mx = self.to_obj.matrix_world
+            imx = mx.inverted()
+            
+            mx2 = self.obj.matrix_world
+            imx2 = mx2.inverted()
+            
+        else:
+            bm = bmesh.new()
+            mx2 = Matrix.Identity(4)
+            imx = Matrix.Identity(4)
+            
+            nm_polystrips = self.obj.name + "_polystrips"
         
-        dest_me  = bpy.data.meshes.new(nm_polystrips)
-        dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
+            dest_me  = bpy.data.meshes.new(nm_polystrips)
+            dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
         
-        dest_obj.matrix_world = self.obj.matrix_world
-        dest_obj.update_tag()
-        dest_obj.show_all_edges = True
-        dest_obj.show_wire      = True
-        dest_obj.show_x_ray     = True
+            dest_obj.matrix_world = self.obj.matrix_world
+            dest_obj.update_tag()
+            dest_obj.show_all_edges = True
+            dest_obj.show_wire      = True
+            dest_obj.show_x_ray     = True
+            
+            context.scene.objects.link(dest_obj)
+            dest_obj.select = True
+            context.scene.objects.active = dest_obj
+            
         
-        bm.to_mesh(dest_me)
+        bmverts = [bm.verts.new(imx * mx2 * v) for v in verts]
+        bm.verts.index_update()
+        for q in quads: bm.faces.new([bmverts[i] for i in q])
         
-        context.scene.objects.link(dest_obj)
-        dest_obj.select = True
-        context.scene.objects.active = dest_obj
-    
+        bm.faces.index_update()
+        
+        if self.to_bme and self.to_obj:
+            bmesh.update_edit_mesh(self.to_obj.data, tessface=False, destructive=True)
+            bm.free()
+        else: 
+            bm.to_mesh(dest_me)
+            bm.free()
+        
     
     ###########################
     # tool functions
