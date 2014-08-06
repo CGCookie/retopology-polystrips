@@ -500,6 +500,7 @@ class GEdge:
         gvert3.connect_gedge(self)
     
     def is_zippered(self): return (self.zip_to_gedge != None)
+    def has_zippered(self): return len(self.zip_attached)!=0
     
     def zip_to(self, gedge):
         assert not self.zip_to_gedge

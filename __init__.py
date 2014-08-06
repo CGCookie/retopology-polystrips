@@ -1004,7 +1004,7 @@ class PolystripsUI:
                 self.polystrips.remove_unconnected_gverts()
                 return ''
             
-            if eventd['press'] == 'K':
+            if eventd['press'] == 'K' and not self.sel_gedge.is_zippered() and not self.sel_gedge.has_zippered():
                 x,y = eventd['mouse']
                 pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
