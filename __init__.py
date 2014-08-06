@@ -300,9 +300,15 @@ class PolystripsUI:
             if self.sel_gvert:
                 for gv in self.sel_gvert.get_inner_gverts():
                     gv.update_visibility(r3d)
+            
+            if len(self.snap_eds):
+                mx = self.obj.matrix_world
+                self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
+            
             self.post_update = False
             self.last_matrix = new_matrix
-        
+            
+            
         if settings.debug < 3:
             self.draw_callback_themed(context)
         else:
@@ -662,11 +668,9 @@ class PolystripsUI:
         mx = self.to_obj.matrix_world
         
         if self.post_update or self.last_matrix != new_matrix:
-            
             #update all the visibility stuff
             self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
-            print(self.snap_eds_vis)
-            
+           
         #sticky highlight...check the hovered edge first
         if self.hover_ed:
             a = location_3d_to_region_2d(region, r3d, mx * self.hover_ed.verts[0].co)
@@ -682,17 +686,14 @@ class PolystripsUI:
         self.hover_ed = None
         for i,ed in enumerate(self.snap_eds):
             if self.snap_eds_vis[i]:
-                'ed is visible..check it'
                 a = location_3d_to_region_2d(region, r3d, mx * ed.verts[0].co)
                 b = location_3d_to_region_2d(region, r3d, mx * ed.verts[1].co)
-            
                 if a and b:
                     intersect = intersect_point_line(mouse_loc, a, b)
     
                     dist = (intersect[0] - mouse_loc).length_squared
                     bound = intersect[1]
                     if (dist < 100) and (bound < 1) and (bound > 0):
-                        print('hovering over %i' % ed.index)
                         self.hover_ed = ed
                         break
                     
