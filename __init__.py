@@ -88,9 +88,9 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         default='2'
         )
     
-    show_edge_count = BoolProperty(
-        name='Show Selected Edge Count',
-        description='Show edge count on selection',
+    show_segment_count = BoolProperty(
+        name='Show Selected Segment Count',
+        description='Show segment count on selection',
         default=True
         )
     
@@ -107,7 +107,7 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         row.prop(self, "theme")
         
         row = layout.row(align=True)
-        row.prop(self, "show_edge_count")
+        row.prop(self, "show_segment_count")
         
         row = layout.row(align=True)
         row.prop(self, "debug")
@@ -373,7 +373,7 @@ class PolystripsUI:
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[0], p3d[1]], color, 2, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[2], p3d[3]], color, 2, "GL_LINE_SMOOTH")
             
-            if settings.show_edge_count:
+            if settings.show_segment_count:
                 draw_gedge_info(self.sel_gedge, context)
         
         if self.act_gvert:
