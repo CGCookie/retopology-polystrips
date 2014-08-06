@@ -1040,6 +1040,12 @@ class PolystripsUI:
                     self.sel_gedge.unzip()
                     return ''
                 
+                lge = self.sel_gedge.gvert0.get_gedges_notnone() + self.sel_gedge.gvert3.get_gedges_notnone()
+                if any(ge.is_zippered() for ge in lge):
+                    # prevent zippering a gedge with gvert that has a zippered gedge already
+                    # TODO: allow this??
+                    return ''
+                
                 x,y = eventd['mouse']
                 pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
