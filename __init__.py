@@ -363,6 +363,7 @@ class PolystripsUI:
                 common_drawing.draw_3d_points(context, p3d, color, 8)
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[0], p3d[1]], color, 2, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[2], p3d[3]], color, 2, "GL_LINE_SMOOTH")
+            draw_gedge_info(self.sel_gedge, context)
         
         if self.act_gvert:
             color = (color_active[0]/255.0, color_active[1]/255.0, color_active[2]/255.0, 1.00)
