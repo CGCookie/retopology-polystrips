@@ -1326,7 +1326,7 @@ class PolyStrips(object):
             
         
         dprint(spc+'creating gedge!')
-        l_bpts = cubic_bezier_fit_points([pt for pt,pr in stroke], min(r0,r3) / 20, force_split=(sgv0==sgv3))
+        l_bpts = cubic_bezier_fit_points([pt for pt,pr in stroke], min(r0,r3) / 20, force_split=(sgv0==sgv3 and sgv0))
         pregv,fgv = None,None
         for i,bpts in enumerate(l_bpts):
             t0,t3,bpt0,bpt1,bpt2,bpt3 = bpts
