@@ -1189,10 +1189,21 @@ class PolyStrips(object):
             strokesegs = list(zip(stroke[:-1],stroke[1:]))
             
             def line_segment_intersection(a0,a1, b0,b1, z):
+                '''
+                3d line segment "intersection" testing
+                
+                returns None if no intersection occurs or a tuple specifying
+                point of intersection and distances from a0->a1 and b0->b1
+                
+                note: this function projects to x,y plane perpendicular to given z
+                      and then ignores (to a degree) any deviation off the plane in
+                      order to find "intersection" of skewed line segments that are
+                      "close enough"
+                '''
                 x = (b1-b0).normalized()
                 y = z.cross(x)
                 
-                oa0,oa1 = a0,a1
+                oa0,oa1,ob0,ob1 = a0,a1,b0,b1
                 la1a0 = (a1-a0).length
                 
                 a0b0 = a0-b0
@@ -1214,7 +1225,8 @@ class PolyStrips(object):
                 cross = a0 + da1a0*dist
                 if cross.x < 0 or cross.x > b1.x: return None
                 
-                return (oa0+(oa1-oa0).normalized()*dist, dist, cross.x)
+                #return (oa0+(oa1-oa0).normalized()*dist, dist, cross.x)
+                return (ob0+(ob1-ob0).normalized()*cross.x, dist, cross.x)
             
             def find_crossing(lps):
                 tot = sum((i0[0]-i1[0]).length for i0,i1 in zip(lps[:-1],lps[1:]))
@@ -1238,8 +1250,10 @@ class PolyStrips(object):
                         
                         ptc,dpt,dp = cross
                         
-                        dprint('crosses: %f/%f' % (t+dp,tot))
-                        return (i, (t+dp)/tot, y0.dot(pt0-p0))
+                        started_inside = y0.dot(pt1-pt0)>0
+                        
+                        dprint(spc+'crosses: %i, %f/%f, started_inside=%s' % (i, t+dp,tot,started_inside))
+                        return (i, (t+dp)/tot, started_inside)
                     
                     t += (p1-p0).length
                 return None
@@ -1279,7 +1293,7 @@ class PolyStrips(object):
             
             num_crosses = len(crosses)
             t = sum(_t for _i,_t,_d in crosses) / num_crosses           # compute average crossing point
-            dprint(spc+'stroke crosses %i gedge %ix [%s], t=%f' % (i_gedge, num_crosses, ','.join('(%i,%f,%f)'%x for x in crosses), t))
+            dprint(spc+'stroke crosses %i gedge %ix [%s], t=%f' % (i_gedge, num_crosses, ','.join('(%i,%f,%s)'%x for x in crosses), t))
             
             cb_split = cubic_bezier_split(p0,p1,p2,p3, t, self.length_scale)
             assert len(cb_split) == 2, 'Could not split bezier (' + (','.join(str(p) for p in [p0,p1,p2,p3])) + ') at %f' % t
@@ -1315,14 +1329,12 @@ class PolyStrips(object):
             
             i0 = crosses[0][0]
             if num_crosses == 1:
-                if crosses[0][2] > 0:
+                if crosses[0][2]:
                     # started stroke inside
-                    if sgv0: continue
                     if sgv0: dprint(spc+'Warning: sgv0 is not None!!')
                     self.insert_gedge_from_stroke(stroke[i0+1:], only_ends, sgv0=gv_split, sgv3=sgv3, depth=depth+1)
                 else:
                     # started stroke outside
-                    if sgv3: continue
                     if sgv3: dprint(spc+'Warning: sgv3 is not None!!')
                     self.insert_gedge_from_stroke(stroke[:i0+0], only_ends, sgv0=sgv0, sgv3=gv_split, depth=depth+1)
                 return

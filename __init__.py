@@ -940,6 +940,43 @@ class PolystripsUI:
             self.sel_gedge,self.sel_gvert = None,None
             return ''
         
+        if eventd['press'] == 'CTRL+LEFTMOUSE':                                     # delete/dissolve
+            x,y = eventd['mouse']
+            pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
+            if not pts:
+                self.sel_gvert,self.sel_gedge,self.act_gvert = None,None,None
+                return ''
+            pt = pts[0]
+            
+            for gv in self.polystrips.gverts:
+                if not gv.is_picked(pt): continue
+                if not (gv.is_endpoint() or gv.is_endtoend() or gv.is_ljunction()): continue
+                
+                if gv.is_endpoint():
+                    self.polystrips.disconnect_gvert(gv)
+                else:
+                    self.polystrips.dissolve_gvert(gv)
+                
+                self.polystrips.remove_unconnected_gverts()
+                self.polystrips.update_visibility(eventd['r3d'])
+                
+                self.sel_gvert = None
+                self.sel_gedge = None
+                return ''
+            
+            for ge in self.polystrips.gedges:
+                if not ge.is_picked(pt): continue
+                
+                self.polystrips.disconnect_gedge(ge)
+                self.polystrips.remove_unconnected_gverts()
+                
+                self.sel_gvert = None
+                self.sel_gedge = None
+                return ''
+            
+            self.sel_gedge,self.sel_gvert = None,None
+            return ''
+        
         if eventd['press'] == 'CTRL+U':
             for gv in self.polystrips.gverts:
                 gv.update_gedges()
