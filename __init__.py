@@ -714,7 +714,8 @@ class PolystripsUI:
                 gv.update()
                 gv.update_visibility(eventd['r3d'], update_gedges=True)
         else:
-            dv = Vector(command) * (2 if eventd['shift'] else 8)
+            factor_slow,factor_fast = 2,8
+            dv = Vector(command) * (factor_slow if eventd['shift'] else factor_fast)
             s2d = l3dr2d(self.tool_data[0][0].position)
             lgv2d = [s2d+relp+dv for _,_,relp in self.tool_data]
             pts = common_utilities.ray_cast_path(eventd['context'], self.obj, lgv2d)
