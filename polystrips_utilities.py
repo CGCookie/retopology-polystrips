@@ -225,7 +225,7 @@ def cubic_bezier_t_of_s_dynamic(p0,p1,p2,p3, initial_step = 50):
     cumul_length += (pi1 - pi0).length
     s_t_map[cumul_length] = 1 
             
-    dprint('initial dt %f, final dt %f' % (1/initial_step, dt))
+    dprint('initial dt %f, final dt %f' % (1/initial_step, dt), l=4)
     return s_t_map
 
 
@@ -307,7 +307,7 @@ def cubic_bezier_fit_value(l_v, l_t):
     
     return (err,v0,v1,v2,v3)
 
-def cubic_bezier_fit_points(l_co, error_scale, depth=0, t0=0, t3=1, allow_split=True):
+def cubic_bezier_fit_points(l_co, error_scale, depth=0, t0=0, t3=1, allow_split=True, force_split=False):
     assert l_co
     if len(l_co)<3:
         p0,p3 = l_co[0],l_co[-1]
@@ -327,9 +327,10 @@ def cubic_bezier_fit_points(l_co, error_scale, depth=0, t0=0, t3=1, allow_split=
     tot_error = ex+ey+ez
     dprint('total error = %f (%f)' % (tot_error,error_scale), l=4)
     
-    if tot_error < error_scale or depth == 4 or len(l_co)<=15 or not allow_split:
-        p0,p1,p2,p3 = Vector((x0,y0,z0)),Vector((x1,y1,z1)),Vector((x2,y2,z2)),Vector((x3,y3,z3))
-        return [(t0,t3,p0,p1,p2,p3)]
+    if not force_split:
+        if tot_error < error_scale or depth == 4 or len(l_co)<=15 or not allow_split:
+            p0,p1,p2,p3 = Vector((x0,y0,z0)),Vector((x1,y1,z1)),Vector((x2,y2,z2)),Vector((x3,y3,z3))
+            return [(t0,t3,p0,p1,p2,p3)]
     
     # too much error in fit.  split sequence in two, and fit each sub-sequence
     

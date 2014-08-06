@@ -23,6 +23,7 @@ Created by Jonathan Denning, Jonathan Williamson, and Patrick Moore
 
 import bpy
 import math
+from math import sin, cos
 import time
 import copy
 from mathutils import Vector, Quaternion
@@ -33,7 +34,7 @@ import blf, bgl
 import itertools
 
 from lib import common_utilities
-from lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
+from lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator,frange
 
 from polystrips_utilities import *
 from polystrips_draw import *
@@ -233,17 +234,20 @@ class GVert:
         pr = profiler.start()
         
         mx = self.obj.matrix_world
+        mxnorm = mx.transposed().inverted().to_3x3()
         mx3x3 = mx.to_3x3()
         imx = mx.inverted()
         
         l,n,i = self.obj.closest_point_on_mesh(imx*self.position)
-        self.snap_pos  = mx * l
-        self.snap_norm = (mx3x3 * n).normalized()
+        self.snap_norm = (mxnorm * n).normalized()
         self.snap_tanx = self.tangent_x.normalized()
         self.snap_tany = self.snap_norm.cross(self.snap_tanx).normalized()
         
         if not self.is_unconnected() or True:
+            self.snap_pos  = mx * l
             self.position = self.snap_pos
+        else:
+            self.snap_pos = self.position
         # NOTE! DO NOT UPDATE NORMAL, TANGENT_X, AND TANGENT_Y
         
         if do_edges:
@@ -882,14 +886,19 @@ class GEdge:
         snaps already computed igverts to surface of object ob
         '''
         mx = self.obj.matrix_world
+        mxnorm = mx.transposed().inverted().to_3x3()
         mx3x3 = mx.to_3x3()
         imx = mx.inverted()
         
         for igv in self.cache_igverts:
             l,n,i = self.obj.closest_point_on_mesh(imx * igv.position)
             igv.position = mx * l
-            igv.normal = (mx3x3 * n).normalized()
+            igv.normal = (mxnorm * n).normalized()
             igv.tangent_y = igv.normal.cross(igv.tangent_x).normalized()
+            igv.snap_pos = igv.position
+            igv.snap_norm = igv.normal
+            igv.snap_tanx = igv.tangent_x
+            igv.snap_tany = igv.tangent_y
         
     
     def is_picked(self, pt):
@@ -1040,10 +1049,27 @@ class PolyStrips(object):
         
         spc = '  '*depth + '- '
         
-        # too few samples?
+        # subsample stroke using linear interpolation if we have too few samples
         if len(stroke) <= 1:
-            dprint(spc+'Too few samples in stroke (subsample??)')
+            dprint(spc+'Too few samples in stroke to subsample')
             return
+        # uniform subsampling
+        while len(stroke) <= 40:
+            stroke = [stroke[0]] + [nptpr for ptpr0,ptpr1 in zip(stroke[:-1],stroke[1:]) for nptpr in [((ptpr0[0]+ptpr1[0])/2,(ptpr0[1]+ptpr1[1])/2), ptpr1]]
+        # non-uniform/detail subsampling
+        done = False
+        while not done:
+            done = True
+            nstroke = [stroke[0]]
+            for ptpr0,ptpr1 in zip(stroke[:-1],stroke[1:]):
+                pt0,pr0 = ptpr0
+                pt1,pr1 = ptpr1
+                if (pt0-pt1).length > (pr0+pr1)/20:
+                    nstroke += [((pt0+pt1)/2, (pr0+pr1)/2)]
+                nstroke += [ptpr1]
+            done = (len(stroke) == len(nstroke))
+            stroke = nstroke
+        
         if sgv0 and sgv0==sgv3 and sgv0.count_gedges() >= 3:
             dprint(spc+'cannot connect stroke to same gvert (too many gedges)')
             sgv3 = None
@@ -1055,9 +1081,60 @@ class PolyStrips(object):
         threshold_splitdist    = (r0+r3)/2 / 2
         
         tot_length = sum((s0[0]-s1[0]).length for s0,s1 in zip(stroke[:-1],stroke[1:]))
-        dprint(spc+'stroke len: %f' % tot_length)
+        dprint(spc+'stroke cnt: %i, len: %f; sgv0: %s; sgv3: %s; only_ends: %s' % (len(stroke),tot_length,'t' if sgv0 else 'f', 't' if sgv3 else 'f', 't' if only_ends else 'f'))
         if tot_length < threshold_tooshort and not (sgv0 and sgv3):
             dprint(spc+'Stroke too short (%f)' % tot_length)
+            return
+        
+        
+        # self intersection test
+        min_i0,min_i1,min_dist = -1,-1,float('inf')
+        for i0,info0 in enumerate(stroke):
+            pt0,pr0 = info0
+            # find where we start to be far enough away
+            i1 = i0+1
+            while i1 < len(stroke):
+                pt1,pr1 = stroke[i1]
+                if (pt0-pt1).length > (pr0+pr1): break
+                i1 += 1
+            while i1 < len(stroke):
+                pt1,pr1 = stroke[i1]
+                d = (pt0-pt1).length - min(pr0,pr1)
+                if d < min_dist:
+                    min_i0 = i0
+                    min_i1 = i1
+                    min_dist = d
+                i1 += 1
+        
+        if min_dist < 0:
+            i0 = min_i0
+            i1 = min_i1
+            
+            pt0,pr0 = stroke[i0]
+            pt1,pr1 = stroke[i1]
+            
+            # create gvert at intersecting points and recurse!
+            gv_intersect = self.create_gvert(pt0, radius=pr0)
+            def find_not_picking(i_start, i_direction):
+                i = i_start
+                while i >= 0 and i < len(stroke):
+                    if not gv_intersect.is_picked(stroke[i][0]): return i
+                    i += i_direction
+                return -1
+            i00 = find_not_picking(i0,-1)
+            i01 = find_not_picking(i0, 1)
+            i10 = find_not_picking(i1,-1)
+            i11 = find_not_picking(i1, 1)
+            dprint(spc+'stroke self intersection %i,%i => %i,%i,%i,%i' % (i0,i1,i00,i01,i10,i11))
+            if i00 != -1:
+                dprint(spc+'seg 0')
+                self.insert_gedge_from_stroke(stroke[:i00], only_ends, sgv0=sgv0, sgv3=gv_intersect, depth=depth+1)
+            if i01 != -1 and i10 != -1:
+                dprint(spc+'seg 1')
+                self.insert_gedge_from_stroke(stroke[i01:i10], only_ends, sgv0=gv_intersect, sgv3=gv_intersect, depth=depth+1)
+            if i11 != -1:
+                dprint(spc+'seg 2')
+                self.insert_gedge_from_stroke(stroke[i11:], only_ends, sgv0=gv_intersect, sgv3=sgv3, depth=depth+1)
             return
         
         
@@ -1070,16 +1147,16 @@ class PolyStrips(object):
         #        pt1,pr1 = info1
         
         
-        def threshold_distance_stroke_point(stroke, point, radius, only_ends):
+        def threshold_distance_stroke_point(stroke, gvert, only_ends):
             if only_ends:
                 # check first end
-                i0,i1 = threshold_distance_stroke_point(stroke, point, radius, False)
+                i0,i1 = threshold_distance_stroke_point(stroke, gvert, False)
                 if i0 == -1 and i1 != -1:
                     return (i0,i1)
                 # check second end
                 rstroke = list(stroke)
                 rstroke.reverse()
-                i0,i1 = threshold_distance_stroke_point(rstroke, point, radius, False)
+                i0,i1 = threshold_distance_stroke_point(rstroke, gvert, False)
                 if i0 == -1 and i1 != -1:
                     i0,i1 = (len(stroke)-1)-i1,-1
                     return (i0,i1)
@@ -1090,10 +1167,10 @@ class PolyStrips(object):
             was_close = False
             for i,info in enumerate(stroke):
                 pt,pr = info
-                d = (pt-point).length
-                is_close = (d < (pr+radius)) #(d < threshold_radius)
+                is_close = gvert.is_picked(pt)
                 if i == 0: was_close = is_close
-                if not was_close and is_close: min_i0 = i
+                if not was_close and is_close:
+                    min_i0 = i
                 if was_close and not is_close:
                     min_i1 = i
                     break
@@ -1101,7 +1178,38 @@ class PolyStrips(object):
             return (min_i0,min_i1)
         
         def find_stroke_crossing(gedge, stroke):
-            def find_crossing(lstrs, lps):
+            strokesegs = list(zip(stroke[:-1],stroke[1:]))
+            
+            def line_segment_intersection(a0,a1, b0,b1, z):
+                x = (b1-b0).normalized()
+                y = z.cross(x)
+                
+                oa0,oa1 = a0,a1
+                la1a0 = (a1-a0).length
+                
+                a0b0 = a0-b0
+                a1b0 = a1-b0
+                
+                if abs(z.dot(a0b0)) > la1a0 and abs(z.dot(a1b0)) > la1a0: return None
+                
+                a0 = Vector((x.dot(a0b0), y.dot(a0b0)))
+                a1 = Vector((x.dot(a1b0), y.dot(a1b0)))
+                b1 = Vector(((b1-b0).length,0))
+                b0 = Vector((0,0))
+                
+                va1a0 = a1 - a0
+                da1a0 = va1a0.normalized()
+                
+                dist = a0.y / -da1a0.y
+                if dist < 0 or dist > la1a0: return None
+                
+                cross = a0 + da1a0*dist
+                if cross.x < 0 or cross.x > b1.x: return None
+                
+                return (oa0+(oa1-oa0).normalized()*dist, dist, cross.x)
+            
+            def find_crossing(lps):
+                tot = sum((i0[0]-i1[0]).length for i0,i1 in zip(lps[:-1],lps[1:]))
                 t = 0
                 for i0,i1 in zip(lps[:-1],lps[1:]):
                     p0,r0,y0 = i0
@@ -1111,48 +1219,26 @@ class PolyStrips(object):
                     p0 = p0 + y0 * r0
                     p1 = p1 + y1 * r1
                     
-                    v10 = p1-p0
-                    l10 = v10.length
-                    d10 = v10 / l10
+                    z = (p1-p0).cross(y0).normalized()
                     
-                    for i,info in enumerate(lstrs):
-                        pt0,pr0 = info[0]
-                        pt1,pr1 = info[1]
+                    for i,strokeseg in enumerate(strokesegs):
+                        pt0,pr0 = strokeseg[0]
+                        pt1,pr1 = strokeseg[1]
                         
-                        vpt01 = pt1-pt0
-                        lpt01 = vpt01.length
-                        dir_pt01 = vpt01.normalized()
+                        cross = line_segment_intersection(pt0,pt1, p0,p1, z)
+                        if not cross: continue
                         
-                        proj_dir = y0.dot(dir_pt01)
-                        if abs(proj_dir) <= 0.0001:
-                            # nearly parallel segments
-                            continue
+                        ptc,dpt,dp = cross
                         
-                        dist_pt0 = y0.dot(pt0-p0)
-                        dist_dir = dist_pt0 / proj_dir
-                        if dist_dir < 0 or dist_dir >= lpt01:
-                            # does not cross stroke segment
-                            continue
-                        
-                        proj_pt0_gedge = p0+d10*(d10.dot(pt0-p0))
-                        ptc = proj_pt0_gedge + d10*dist_dir
-                        #ptc = pt0 + dir_pt01 * dist_dir
-                        tc = (ptc-p0).length
-                        if tc < 0 or tc >= l10:
-                            # does not cross gedge segment
-                            continue
-                        
-                        # crosses!!
-                        tot = sum((_i0[0] - _i1[0]).length for _i0,_i1 in zip(lps[:-1],lps[1:]))
-                        return (i, (t+tc)/tot, dist_pt0)
-                    t += l10
+                        dprint('crosses: %f/%f' % (t+dp,tot))
+                        return (i, (t+dp)/tot, y0.dot(pt0-p0))
+                    
+                    t += (p1-p0).length
                 return None
             
-            lstrs = list(zip(stroke[:-1],stroke[1:]))
             odds = [gv for i,gv in enumerate(gedge.cache_igverts) if i%2==1]
-            
-            cross0 = find_crossing(lstrs, [(gv.position,gv.radius, gv.tangent_y) for gv in odds])
-            cross1 = find_crossing(lstrs, [(gv.position,gv.radius,-gv.tangent_y) for gv in odds])
+            cross0 = find_crossing([(gv.position,gv.radius, gv.tangent_y) for gv in odds])
+            cross1 = find_crossing([(gv.position,gv.radius,-gv.tangent_y) for gv in odds])
             
             return sorted([x for x in [cross0,cross1] if x], key=lambda x: x[0])
         
@@ -1160,7 +1246,8 @@ class PolyStrips(object):
             # check if we're close to either endpoint of gedge
             for i_gv,gv in [(0,gedge.gvert0),(3,gedge.gvert3)]:
                 is_joined = False
-                min_i0,min_i1 = threshold_distance_stroke_point(stroke, gv.position, gv.radius, only_ends)
+                min_i0,min_i1 = threshold_distance_stroke_point(stroke, gv, only_ends)
+                #dprint(spc+'%i.%i: min = %i, %i; gv.count = %i' % (i_gedge,i_gv,min_i0,min_i1,gv.count_gedges()))
                 if min_i0 != -1 and gv.count_gedges() < 4:
                     dprint(spc+'Joining gedge[%i].gvert%i; Joining stroke at 0-%i' % (i_gedge,i_gv,min_i0))
                     self.insert_gedge_from_stroke(stroke[:min_i0], only_ends, sgv0=sgv0, sgv3=gv, depth=depth+1)
@@ -1183,7 +1270,7 @@ class PolyStrips(object):
             p0,p1,p2,p3 = gedge.get_positions()
             
             num_crosses = len(crosses)
-            t = sum(_t for _i,_t,_d in crosses) / num_crosses
+            t = sum(_t for _i,_t,_d in crosses) / num_crosses           # compute average crossing point
             dprint(spc+'stroke crosses %i gedge %ix [%s], t=%f' % (i_gedge, num_crosses, ','.join('(%i,%f,%f)'%x for x in crosses), t))
             
             cb_split = cubic_bezier_split(p0,p1,p2,p3, t, self.length_scale)
@@ -1222,10 +1309,12 @@ class PolyStrips(object):
             if num_crosses == 1:
                 if crosses[0][2] > 0:
                     # started stroke inside
+                    if sgv0: continue
                     if sgv0: dprint(spc+'Warning: sgv0 is not None!!')
                     self.insert_gedge_from_stroke(stroke[i0+1:], only_ends, sgv0=gv_split, sgv3=sgv3, depth=depth+1)
                 else:
                     # started stroke outside
+                    if sgv3: continue
                     if sgv3: dprint(spc+'Warning: sgv3 is not None!!')
                     self.insert_gedge_from_stroke(stroke[:i0+0], only_ends, sgv0=sgv0, sgv3=gv_split, depth=depth+1)
                 return
@@ -1237,7 +1326,7 @@ class PolyStrips(object):
             
         
         dprint(spc+'creating gedge!')
-        l_bpts = cubic_bezier_fit_points([pt for pt,pr in stroke], min(r0,r3) / 20)
+        l_bpts = cubic_bezier_fit_points([pt for pt,pr in stroke], min(r0,r3) / 20, force_split=(sgv0==sgv3 and sgv0))
         pregv,fgv = None,None
         for i,bpts in enumerate(l_bpts):
             t0,t3,bpt0,bpt1,bpt2,bpt3 = bpts
@@ -1262,8 +1351,8 @@ class PolyStrips(object):
                 dprint(spc+str(l_bpts))
                 dprint(spc+(str(sgv0.position) if sgv0 else 'None'))
                 dprint(spc+(str(sgv3.position) if sgv3 else 'None'))
-            
-            self.create_gedge(gv0,gv1,gv2,gv3)
+            else:
+                self.create_gedge(gv0,gv1,gv2,gv3)
             pregv = gv3
             gv0.update()
             gv0.update_gedges()
