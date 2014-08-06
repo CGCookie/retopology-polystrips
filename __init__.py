@@ -1170,10 +1170,14 @@ class PolystripsUI:
                 if not pts:
                     return ''
                 pt = pts[0]
+                sel_ge = set(self.sel_gvert.get_gedges_notnone())
                 for gv in self.polystrips.gverts:
                     if gv.is_inner() or not gv.is_picked(pt) or gv == self.sel_gvert: continue
                     if len(self.sel_gvert.get_gedges_notnone()) + len(gv.get_gedges_notnone()) > 4:
                         dprint('Too many connected GEdges for merge!')
+                        continue
+                    if any(ge in sel_ge for ge in gv.get_gedges_notnone()):
+                        dprint('Cannot merge GVerts that share a GEdge')
                         continue
                     self.polystrips.merge_gverts(self.sel_gvert, gv)
                     self.sel_gvert = gv
