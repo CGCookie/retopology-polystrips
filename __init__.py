@@ -63,6 +63,8 @@ from polystrips_draw import *
 # Used to store keymaps for addon
 polystrips_keymaps = []
 
+#used to store undo snapshots
+polystrips_undo_cache = []
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -97,6 +99,12 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
     quad_prev_radius = IntProperty(
         name="Pixel Brush Radius",
         description = "Pixel brush size",
+        default=15,
+        )
+    
+    undo_depth = IntProperty(
+        name="Undo Depth",
+        description = "Max number of undo steps",
         default=15,
         )
     
@@ -303,6 +311,7 @@ class PolystripsUI:
         
         self.polystrips = PolyStrips(context, self.obj)
         
+        polystrips_undo_cache = []  #clear the cache in case any is left over
         if self.obj.grease_pencil:
             self.create_polystrips_from_greasepencil()
         elif 'BezierCurve' in bpy.data.objects:
@@ -310,7 +319,68 @@ class PolystripsUI:
         
         context.area.header_text_set('PolyStrips')
     
-    
+    ###############################
+    def create_undo_snapshot(self, action):
+        '''
+        unsure about all the _timers get deep copied
+        and if sel_gedges and verts get copied as references
+        or also duplicated, making them no longer valid.
+        '''
+        settings = common_utilities.get_settings()
+        repeated_actions = {'count','zip count'}
+        
+        if action in repeated_actions and len(polystrips_undo_cache):
+            if action == polystrips_undo_cache[-1][1]:
+                print('repeatable...dont take snapshot')
+                return
+        
+        p_data = copy.deepcopy(self.polystrips)
+        
+        if self.sel_gedge:
+            sel_gedge = self.polystrips.gedges.index(self.sel_gedge)
+        else:
+            sel_gedge = None
+            
+        if self.sel_gvert:
+            sel_gvert = self.polystrips.gverts.index(self.sel_gvert)
+        else:
+            sel_gvert = None
+            
+        if self.act_gvert:
+            act_gvert = self.polystrips.gverts.index(self.sel_gvert)
+        else:
+            act_gvert = None
+            
+        polystrips_undo_cache.append(([p_data, sel_gvert, sel_gedge, act_gvert], action))
+            
+        if len(polystrips_undo_cache) > settings.undo_depth:
+            polystrips_undo_cache.pop(0)
+            
+            
+    def undo_action(self):
+        '''
+        '''
+        if len(polystrips_undo_cache) > 0:
+            data, action = polystrips_undo_cache.pop()
+            
+            self.polystrips = data[0]
+            
+            if data[1]:
+                self.sel_gvert = self.polystrips.gverts[data[1]]
+            else:
+                self.sel_gvert = None
+                
+            if data[2]:
+                self.sel_gedge = self.polystrips.gedges[data[2]]
+            else:
+                self.sel_gedge = None
+                
+            if data[3]:
+                self.act_gvert = self.polystrips.gverts[data[3]]
+            else:
+                self.act_gvert = None
+                
+
     def cleanup(self, context):
         '''
         remove temporary object
@@ -1020,6 +1090,11 @@ class PolystripsUI:
             
             self.hover_geom(eventd)
         
+        
+        if eventd['press'] == 'CTRL+Z':
+            self.undo_action()
+            return ''
+        
         if eventd['press'] == 'F':
             self.ready_tool(eventd, self.scale_brush_pixel_radius)
             return 'brush scale tool'
@@ -1038,7 +1113,9 @@ class PolystripsUI:
             return ''
         
         
-        if eventd['press'] in {'LEFTMOUSE','SHIFT+LEFTMOUSE'}:                      # start sketching
+        if eventd['press'] in {'LEFTMOUSE','SHIFT+LEFTMOUSE'}:
+            self.create_undo_snapshot('sketch')                   
+            # start sketching
             self.footer = 'Sketching'
             x,y = eventd['mouse']
             p   = eventd['pressure']
@@ -1136,6 +1213,7 @@ class PolystripsUI:
             return ''
         
         if eventd['press'] == 'CTRL+U':
+            self.create_undo_snapshot('update')
             for gv in self.polystrips.gverts:
                 gv.update_gedges()
         
@@ -1145,12 +1223,14 @@ class PolystripsUI:
         
         if self.sel_gedge:
             if eventd['press'] == 'X':
+                self.create_undo_snapshot('delete')
                 self.polystrips.disconnect_gedge(self.sel_gedge)
                 self.sel_gedge = None
                 self.polystrips.remove_unconnected_gverts()
                 return ''
             
             if eventd['press'] == 'K' and not self.sel_gedge.is_zippered() and not self.sel_gedge.has_zippered():
+                self.create_undo_snapshot('knife')
                 x,y = eventd['mouse']
                 pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
@@ -1162,27 +1242,31 @@ class PolystripsUI:
                 self.sel_gvert = gv
             
             if eventd['press'] == 'U':
+                self.create_undo_snapshot('update')
                 self.sel_gedge.gvert0.update_gedges()
                 self.sel_gedge.gvert3.update_gedges()
                 return ''
             
             if eventd['press']in {'CTRL+WHEELUPMOUSE', 'UP_ARROW'}:
-                dprint('increase quads')
+                self.create_undo_snapshot('count')
                 self.sel_gedge.n_quads += 1
                 self.sel_gedge.force_count = True
                 self.sel_gedge.update()
                 return ''
             
             if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'DOWN_ARROW'}:
-                dprint('decrease quads')
+    
                 if self.sel_gedge.n_quads > 3:
+                    self.create_undo_snapshot('count')
                     self.sel_gedge.n_quads -= 1
                     self.sel_gedge.force_count = True
                     self.sel_gedge.update()
                 return ''
             
             if eventd['press'] == 'Z':
+                
                 if self.sel_gedge.zip_to_gedge:
+                    self.create_undo_snapshot('unzip')
                     self.sel_gedge.unzip()
                     return ''
                 
@@ -1200,12 +1284,14 @@ class PolystripsUI:
                 for ge in self.polystrips.gedges:
                     if ge == self.sel_gedge: continue
                     if not ge.is_picked(pt): continue
+                    self.create_undo_snapshot('zip')
                     self.sel_gedge.zip_to(ge)
                     return ''
                 return ''
             
             if eventd['press'] == 'G':
                 if not self.sel_gedge.is_zippered():
+                    self.create_undo_snapshot('grab')
                     self.ready_tool(eventd, self.grab_tool_gedge)
                     return 'grab tool'
                 return ''
@@ -1220,6 +1306,7 @@ class PolystripsUI:
                 return ''
             
             if eventd['press'] == 'CTRL+R' and not self.sel_gedge.is_zippered():
+                self.create_undo_snapshot('rib')
                 self.sel_gedge = self.polystrips.rip_gedge(self.sel_gedge)
                 self.ready_tool(eventd, self.grab_tool_gedge)
                 return 'grab tool'
@@ -1241,7 +1328,7 @@ class PolystripsUI:
                 pt = pts[0]
                 for ge in self.polystrips.gedges:
                     if not ge.is_picked(pt): continue
-                    
+                    self.create_undo_snapshot('split')
                     t,d = ge.get_closest_point(pt)
                     self.polystrips.split_gedge_at_t(ge, t, connect_gvert=self.sel_gvert)
                     return ''
@@ -1250,12 +1337,14 @@ class PolystripsUI:
             if eventd['press'] == 'X':
                 if self.sel_gvert.is_inner():
                     return ''
+                self.create_undo_snapshot('delete')
                 self.polystrips.disconnect_gvert(self.sel_gvert)
                 self.sel_gvert = None
                 self.polystrips.remove_unconnected_gverts()
                 return ''
             
             if eventd['press'] == 'CTRL+D':
+                self.create_undo_snapshot('dissolve')
                 self.polystrips.dissolve_gvert(self.sel_gvert)
                 self.sel_gvert = None
                 self.polystrips.remove_unconnected_gverts()
@@ -1263,35 +1352,42 @@ class PolystripsUI:
                 return ''
             
             if eventd['press'] == 'S':
+                self.create_undo_snapshot('scale')
                 self.ready_tool(eventd, self.scale_tool_gvert_radius)
                 return 'scale tool'
             
             
             if eventd['press'] == 'CTRL+G':
+                self.create_undo_snapshot('grab')
                 self.ready_tool(eventd, self.grab_tool_gvert)
                 return 'grab tool'
             
             if eventd['press'] == 'G':
+                self.create_undo_snapshot('grab')
                 self.ready_tool(eventd, self.grab_tool_gvert_neighbors)
                 return 'grab tool'
             
             
             if eventd['press'] == 'CTRL+C':
+                self.create_undo_snapshot('toggle')
                 self.sel_gvert.toggle_corner()
                 self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
                 return ''
             
             
             if eventd['press'] == 'CTRL+S':
+                self.create_undo_snapshot('scale')
                 self.ready_tool(eventd, self.scale_tool_gvert)
                 return 'scale tool'
             
             if eventd['press'] == 'C':
+                self.create_undo_snapshot('smooth')
                 self.sel_gvert.smooth()
                 self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
                 return ''
             
             if eventd['press'] == 'R':
+                self.create_undo_snapshot('rotate')
                 self.ready_tool(eventd, self.rotate_tool_gvert_neighbors)
                 return 'rotate tool'
             
@@ -1310,6 +1406,7 @@ class PolystripsUI:
                 pt = pts[0]
                 for ge in self.sel_gvert.get_gedges_notnone():
                     if not ge.is_picked(pt): continue
+                    self.create_undo_snapshot('rip')
                     self.sel_gvert = self.polystrips.rip_gedge(ge, at_gvert=self.sel_gvert)
                     self.ready_tool(eventd, self.grab_tool_gvert_neighbors)
                     return 'grab tool'
@@ -1331,6 +1428,7 @@ class PolystripsUI:
                     if any(ge in sel_ge for ge in gv.get_gedges_notnone()):
                         dprint('Cannot merge GVerts that share a GEdge')
                         continue
+                    self.create_undo_snapshot('merge')
                     self.polystrips.merge_gverts(self.sel_gvert, gv)
                     self.sel_gvert = gv
                     return ''
@@ -1342,6 +1440,7 @@ class PolystripsUI:
                 gvthat = self.sel_gvert.get_zip_pair()
                 
                 if eventd['press'] == 'CTRL+NUMPAD_PLUS':
+                    self.create_undo_snapshot('zip count')
                     max_t = 1 if gvthis.zip_t>gvthat.zip_t else gvthat.zip_t-0.05
                     gvthis.zip_t = min(gvthis.zip_t+0.05, max_t)
                     gvthis.zip_over_gedge.update()
@@ -1349,6 +1448,7 @@ class PolystripsUI:
                     return ''
                 
                 if eventd['press'] == 'CTRL+NUMPAD_MINUS':
+                    self.create_undo_snapshot('zip count')
                     min_t = 0 if gvthis.zip_t<gvthat.zip_t else gvthat.zip_t+0.05
                     gvthis.zip_t = max(gvthis.zip_t-0.05, min_t)
                     gvthis.zip_over_gedge.update()
@@ -1535,6 +1635,7 @@ class PolystripsUI:
         
         if nmode in {'finish','cancel'}:
             self.kill_timer(context)
+            polystrips_undo_cache = []
             return {'FINISHED'} if nmode == 'finish' else {'CANCELLED'}
         
         if nmode: self.mode = nmode
