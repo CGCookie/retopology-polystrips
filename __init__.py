@@ -164,6 +164,7 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
     def modal(self, context, event):
         ret = self.ui.modal(context, event)
         if 'FINISHED' in ret or 'CANCELLED' in ret:
+            self.ui.cleanup(context)
             common_utilities.callback_cleanup(self, context)
         return ret
     
@@ -236,7 +237,15 @@ class PolystripsUI:
         self.scale = self.obj.scale[0]
         self.length_scale = get_object_length_scale(self.obj)
         
-        self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+        self.obj_orig = context.object
+        
+        # duplicate selected objected to temporary object but with modifiers applied
+        self.me = self.obj_orig.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+        self.me.update()
+        self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
+        bpy.context.scene.objects.link(self.obj)
+        self.obj.hide = True
+        self.obj.matrix_world = self.obj_orig.matrix_world
         self.me.update()
         self.bme = bmesh.new()
         self.bme.from_mesh(self.me)
@@ -266,6 +275,37 @@ class PolystripsUI:
         
         context.area.header_text_set('PolyStrips')
     
+    
+    def cleanup(self, context):
+        '''
+        remove temporary object
+        '''
+        
+        dprint('cleaning up!')
+        
+        tmpobj = bpy.data.objects['PolystripsTmp']
+        meobj  = tmpobj.data
+        
+        # remember what was selected and active
+        l_selected = [o for o in bpy.data.objects if o.select]
+        active_obj = bpy.context.scene.objects.active
+        
+        # deselect all
+        for o in l_selected: o.select = False
+        
+        # select temporary object
+        tmpobj.select = True
+        bpy.context.scene.objects.active = tmpobj
+        
+        # delete object
+        tmpobj.hide = False             # must unhide first!!
+        bpy.ops.object.delete()
+        bpy.context.scene.update()
+        bpy.data.meshes.remove(meobj)
+        
+        # recall previously selected and active objects
+        for o in l_selected: o.select = True
+        bpy.context.scene.objects.active = active_obj
     
     ################################
     # draw functions
