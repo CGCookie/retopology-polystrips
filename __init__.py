@@ -550,7 +550,7 @@ class PolystripsUI:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
-            if hit_idx != -1 and not self.hover_ed:
+            if hit_idx != -1: # and not self.hover_ed:
                 mx = self.obj.matrix_world
                 mxnorm = mx.transposed().inverted().to_3x3()
                 hit_p3d = mx * hit_p3d
@@ -566,7 +566,7 @@ class PolystripsUI:
                     hit_norm = mxnorm * hit_norm
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
-        if self.hover_ed:
+        if self.hover_ed and False:
             color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
             common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
     
