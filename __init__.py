@@ -234,10 +234,21 @@ class PolystripsUI:
         self.stroke_smoothing = 0.5          # 0: no smoothing. 1: no change
         
         if context.mode == 'OBJECT':
-            self.obj = context.object
 
-            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.obj_orig = context.object
+            # duplicate selected objected to temporary object but with modifiers applied
+            self.me = self.obj_orig.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
             self.me.update()
+            self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
+            bpy.context.scene.objects.link(self.obj)
+            self.obj.hide = False
+            self.obj.matrix_world = self.obj_orig.matrix_world
+            self.me.update()
+            
+            #HACK
+            bpy.ops.object.mode_set(mode = 'EDIT')
+            bpy.ops.object.mode_set(mode = 'OBJECT')
+            
             self.bme = bmesh.new()
             self.bme.from_mesh(self.me)
             
@@ -248,11 +259,20 @@ class PolystripsUI:
             self.hover_ed = None
             
         if context.mode == 'EDIT_MESH':
-            self.obj = [ob for ob in context.selected_objects if ob != context.object][0]
-            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.obj_orig = [ob for ob in context.selected_objects if ob != context.object][0]
+            self.me = self.obj_orig.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
             self.me.update()
             self.bme = bmesh.new()
             self.bme.from_mesh(self.me)
+            
+            self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
+            bpy.context.scene.objects.link(self.obj)
+            self.obj.hide = True
+            self.obj.matrix_world = self.obj_orig.matrix_world
+            self.me.update()
+            
+            bpy.ops.object.mode_set(mode = 'OBJECT')
+            bpy.ops.object.mode_set(mode = 'EDIT')
             
             self.to_obj = context.object
             self.to_bme = bmesh.from_edit_mesh(context.object.data)
@@ -295,32 +315,20 @@ class PolystripsUI:
         '''
         remove temporary object
         '''
-        
         dprint('cleaning up!')
         
-        tmpobj = bpy.data.objects['PolystripsTmp']
+        tmpobj = self.obj #not always, sometimes if duplicate remains...will be .001
         meobj  = tmpobj.data
         
-        # remember what was selected and active
-        l_selected = [o for o in bpy.data.objects if o.select]
-        active_obj = bpy.context.scene.objects.active
-        
-        # deselect all
-        for o in l_selected: o.select = False
-        
-        # select temporary object
-        tmpobj.select = True
-        bpy.context.scene.objects.active = tmpobj
-        
         # delete object
-        tmpobj.hide = False             # must unhide first!!
-        bpy.ops.object.delete()
+        context.scene.objects.unlink(tmpobj)
+        tmpobj.user_clear()
+        if tmpobj.name in bpy.data.objects:
+            bpy.data.objects.remove(tmpobj)
+        
         bpy.context.scene.update()
         bpy.data.meshes.remove(meobj)
         
-        # recall previously selected and active objects
-        for o in l_selected: o.select = True
-        bpy.context.scene.objects.active = active_obj
     
     ################################
     # draw functions
