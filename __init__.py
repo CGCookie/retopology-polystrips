@@ -258,6 +258,7 @@ class PolystripsUI:
         
         self.polystrips = PolyStrips(context, self.obj)
         
+        polystrips_undo_cache = []  #clear the cache in case any is left over
         if self.obj.grease_pencil:
             self.create_polystrips_from_greasepencil()
         elif 'BezierCurve' in bpy.data.objects:
@@ -1427,6 +1428,7 @@ class PolystripsUI:
         
         if nmode in {'finish','cancel'}:
             self.kill_timer(context)
+            polystrips_undo_cache = []
             return {'FINISHED'} if nmode == 'finish' else {'CANCELLED'}
         
         if nmode: self.mode = nmode
