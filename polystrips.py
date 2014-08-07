@@ -1036,12 +1036,21 @@ class PolyStrips(object):
         gv1_2 = self.create_gvert(cb1[2], radius=rm)
         gv1_3 = gedge.gvert3
         
+        # want to *replace* gedge with new gedges
+        lgv0ge = gv0_0.get_gedges()
+        lgv3ge = gv1_3.get_gedges()
+        
         self.disconnect_gedge(gedge)
         ge0 = self.create_gedge(gv0_0,gv0_1,gv0_2,gv0_3)
         ge1 = self.create_gedge(gv1_0,gv1_1,gv1_2,gv1_3)
         
-        ge0.gvert0.update()
-        ge1.gvert3.update()
+        lgv0ge = [ge0 if ge==gedge else ge for ge in lgv0ge]
+        lgv3ge = [ge1 if ge==gedge else ge for ge in lgv3ge]
+        gv0_0.gedge0,gv0_0.gedge1,gv0_0.gedge2,gv0_0.gedge3 = lgv0ge
+        gv1_3.gedge0,gv1_3.gedge1,gv1_3.gedge2,gv1_3.gedge3 = lgv3ge
+        
+        gv0_0.update()
+        gv1_3.update()
         gv_split.update()
         gv_split.update_gedges()
         

@@ -1236,7 +1236,7 @@ class PolystripsUI:
                 if not pts:
                     return ''
                 pt = pts[0]
-                t,d = self.sel_gedge.get_closest_point(pt)
+                t,_    = self.sel_gedge.get_closest_point(pt)
                 _,_,gv = self.polystrips.split_gedge_at_t(self.sel_gedge, t)
                 self.sel_gedge = None
                 self.sel_gvert = gv
