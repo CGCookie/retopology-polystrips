@@ -233,23 +233,38 @@ class PolystripsUI:
         
         self.stroke_smoothing = 0.5          # 0: no smoothing. 1: no change
         
-        self.obj = context.object
-        self.scale = self.obj.scale[0]
-        self.length_scale = get_object_length_scale(self.obj)
-        
-        self.obj_orig = context.object
-        
-        # duplicate selected objected to temporary object but with modifiers applied
-        self.me = self.obj_orig.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
-        self.me.update()
-        self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
-        bpy.context.scene.objects.link(self.obj)
-        self.obj.hide = True
-        self.obj.matrix_world = self.obj_orig.matrix_world
-        self.me.update()
-        self.bme = bmesh.new()
-        self.bme.from_mesh(self.me)
-        
+        if context.mode == 'OBJECT':
+            self.obj = context.object
+
+            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.me.update()
+            self.bme = bmesh.new()
+            self.bme.from_mesh(self.me)
+            
+            self.to_obj = None
+            self.to_bme = None
+            self.snap_eds = []
+            self.snap_eds_vis = []
+            self.hover_ed = None
+            
+        if context.mode == 'EDIT_MESH':
+            self.obj = [ob for ob in context.selected_objects if ob != context.object][0]
+            self.me = self.obj.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
+            self.me.update()
+            self.bme = bmesh.new()
+            self.bme.from_mesh(self.me)
+            
+            self.to_obj = context.object
+            self.to_bme = bmesh.from_edit_mesh(context.object.data)
+            self.snap_eds = [ed for ed in self.to_bme.edges if not ed.is_manifold]
+            region,r3d = context.region,context.space_data.region_3d
+            mx = self.to_obj.matrix_world
+            rv3d = context.space_data.region_3d
+            self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, rv3d) for ed in self.snap_eds]
+            self.hover_ed = None
+            
+        self.scale = self.obj.scale[0]    
+        self.length_scale = get_object_length_scale(self.obj)    
         #world stroke radius
         self.stroke_radius = 0.01 * self.length_scale
         self.stroke_radius_pressure = 0.01 * self.length_scale
@@ -326,14 +341,22 @@ class PolystripsUI:
             if self.sel_gvert:
                 for gv in self.sel_gvert.get_inner_gverts():
                     gv.update_visibility(r3d)
+            
+            if len(self.snap_eds):
+                mx = self.obj.matrix_world
+                self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
+            
             self.post_update = False
             self.last_matrix = new_matrix
-        
+            
+            
         if settings.debug < 3:
             self.draw_callback_themed(context)
         else:
             self.draw_callback_debug(context)
     
+        
+            
     def draw_callback_themed(self, context):
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
@@ -449,7 +472,7 @@ class PolystripsUI:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
-            if hit_idx != -1:
+            if hit_idx != -1 and not self.hover_ed:
                 mx = self.obj.matrix_world
                 mxnorm = mx.transposed().inverted().to_3x3()
                 hit_p3d = mx * hit_p3d
@@ -465,7 +488,11 @@ class PolystripsUI:
                     hit_norm = mxnorm * hit_norm
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
+        if self.hover_ed:
+            color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
+            common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
     
+            
     def draw_callback_debug(self, context):
         settings = common_utilities.get_settings()
         region = context.region
@@ -618,7 +645,10 @@ class PolystripsUI:
                 hit_p3d = mx * hit_p3d
                 common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
-        self.sketch_brush.draw(context)
+        if not self.hover_ed:
+            self.sketch_brush.draw(context)
+        else:
+            common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color_selected)
     
     
     ############################
@@ -626,28 +656,92 @@ class PolystripsUI:
     
     def create_mesh(self, context):
         verts,quads = self.polystrips.create_mesh()
-        bm = bmesh.new()
-        for v in verts: bm.verts.new(v)
-        for q in quads: bm.faces.new([bm.verts[i] for i in q])
         
-        nm_polystrips = self.obj.name + "_polystrips"
+        if self.to_bme and self.to_obj:  #EDIT MDOE on Existing Mesh
+            bm = self.to_bme
+            mx = self.to_obj.matrix_world
+            imx = mx.inverted()
+            
+            mx2 = self.obj.matrix_world
+            imx2 = mx2.inverted()
+            
+        else:
+            bm = bmesh.new()
+            mx2 = Matrix.Identity(4)
+            imx = Matrix.Identity(4)
+            
+            nm_polystrips = self.obj.name + "_polystrips"
         
-        dest_me  = bpy.data.meshes.new(nm_polystrips)
-        dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
+            dest_me  = bpy.data.meshes.new(nm_polystrips)
+            dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
         
-        dest_obj.matrix_world = self.obj.matrix_world
-        dest_obj.update_tag()
-        dest_obj.show_all_edges = True
-        dest_obj.show_wire      = True
-        dest_obj.show_x_ray     = True
+            dest_obj.matrix_world = self.obj.matrix_world
+            dest_obj.update_tag()
+            dest_obj.show_all_edges = True
+            dest_obj.show_wire      = True
+            dest_obj.show_x_ray     = True
+            
+            context.scene.objects.link(dest_obj)
+            dest_obj.select = True
+            context.scene.objects.active = dest_obj
+            
         
-        bm.to_mesh(dest_me)
+        bmverts = [bm.verts.new(imx * mx2 * v) for v in verts]
+        bm.verts.index_update()
+        for q in quads: bm.faces.new([bmverts[i] for i in q])
         
-        context.scene.objects.link(dest_obj)
-        dest_obj.select = True
-        context.scene.objects.active = dest_obj
+        bm.faces.index_update()
+        
+        if self.to_bme and self.to_obj:
+            bmesh.update_edit_mesh(self.to_obj.data, tessface=False, destructive=True)
+            bm.free()
+        else: 
+            bm.to_mesh(dest_me)
+            bm.free()
+        
+    ###########################
+    # hover functions
     
+    def hover_geom(self,eventd):
+        if not len(self.snap_eds): return 
+        context = eventd['context']
+        region,r3d = context.region,context.space_data.region_3d
+        new_matrix = [v for l in r3d.view_matrix for v in l]
+        x, y = eventd['mouse']
+        mouse_loc = Vector((x,y))
+        mx = self.to_obj.matrix_world
+        
+        if self.post_update or self.last_matrix != new_matrix:
+            #update all the visibility stuff
+            self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
+           
+        #sticky highlight...check the hovered edge first
+        if self.hover_ed:
+            a = location_3d_to_region_2d(region, r3d, mx * self.hover_ed.verts[0].co)
+            b = location_3d_to_region_2d(region, r3d, mx * self.hover_ed.verts[1].co)
+            
+            if a and b:
+                intersect = intersect_point_line(mouse_loc, a, b)
+                dist = (intersect[0] - mouse_loc).length_squared
+                bound = intersect[1]
+                if (dist < 100) and (bound < 1) and (bound > 0):
+                    return
     
+        self.hover_ed = None
+        for i,ed in enumerate(self.snap_eds):
+            if self.snap_eds_vis[i]:
+                a = location_3d_to_region_2d(region, r3d, mx * ed.verts[0].co)
+                b = location_3d_to_region_2d(region, r3d, mx * ed.verts[1].co)
+                if a and b:
+                    intersect = intersect_point_line(mouse_loc, a, b)
+    
+                    dist = (intersect[0] - mouse_loc).length_squared
+                    bound = intersect[1]
+                    if (dist < 100) and (bound < 1) and (bound > 0):
+                        self.hover_ed = ed
+                        break
+                    
+                        
     ###########################
     # tool functions
     
@@ -915,7 +1009,8 @@ class PolystripsUI:
             if self.sketch_brush.world_width:
                 self.stroke_radius = self.sketch_brush.world_width
                 self.stroke_radius_pressure = self.sketch_brush.world_width
-            #continue?
+            
+            self.hover_geom(eventd)
         
         if eventd['press'] == 'F':
             self.ready_tool(eventd, self.scale_brush_pixel_radius)
