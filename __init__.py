@@ -630,6 +630,8 @@ class PolystripsUI:
         self.action_radius = rad
         self.mode_radius   = rad
         
+        self.prev_pos      = (mx,my)
+        
         # spc = bpy.data.window_managers['WinMan'].windows[0].screen.areas[4].spaces[0]
         # r3d = spc.region_3d
         vrot = r3d.view_rotation
@@ -714,7 +716,7 @@ class PolystripsUI:
                 gv.update()
                 gv.update_visibility(eventd['r3d'], update_gedges=True)
         else:
-            factor_slow,factor_fast = 2,8
+            factor_slow,factor_fast = 0.2,1.0
             dv = Vector(command) * (factor_slow if eventd['shift'] else factor_fast)
             s2d = l3dr2d(self.tool_data[0][0].position)
             lgv2d = [s2d+relp+dv for _,_,relp in self.tool_data]
@@ -1022,14 +1024,14 @@ class PolystripsUI:
                 return ''
             
             if eventd['press']in {'CTRL+WHEELUPMOUSE', 'UP_ARROW'}:
-                print('increase quads')
+                dprint('increase quads')
                 self.sel_gedge.n_quads += 1
                 self.sel_gedge.force_count = True
                 self.sel_gedge.update()
                 return ''
             
             if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'DOWN_ARROW'}:
-                print('decrease quads')
+                dprint('decrease quads')
                 if self.sel_gedge.n_quads > 3:
                     self.sel_gedge.n_quads -= 1
                     self.sel_gedge.force_count = True
@@ -1291,7 +1293,7 @@ class PolystripsUI:
     def modal_grab_tool(self, eventd):
         cx,cy = self.action_center
         mx,my = eventd['mouse']
-        px,py = self.mode_pos
+        px,py = self.prev_pos #mode_pos
         sx,sy = self.mode_start
         
         if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE','SHIFT+RET','SHIFT+NUMPAD_ENTER','SHIFT+LEFTMOUSE'}:
@@ -1304,6 +1306,7 @@ class PolystripsUI:
         
         if eventd['type'] == 'MOUSEMOVE':
             self.tool_fn((mx-px,my-py), eventd)
+            self.prev_pos = (mx,my)
             return ''
         
         return ''
@@ -1311,7 +1314,7 @@ class PolystripsUI:
     def modal_rotate_tool(self, eventd):
         cx,cy = self.action_center
         mx,my = eventd['mouse']
-        px,py = self.mode_pos
+        px,py = self.prev_pos #mode_pos
         
         if eventd['press'] in {'RET', 'NUMPAD_ENTER', 'LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
@@ -1327,6 +1330,7 @@ class PolystripsUI:
             ang = vp.angle(vm) * (-1 if vp.cross(vm).z<0 else 1)
             self.tool_rot += ang
             self.tool_fn(self.tool_rot, eventd)
+            self.prev_pos = (mx,my)
             return ''
         
         return ''
