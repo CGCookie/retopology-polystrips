@@ -249,7 +249,7 @@ class PolystripsUI:
             self.me.update()
             self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
             bpy.context.scene.objects.link(self.obj)
-            self.obj.hide = False
+            self.obj.hide = True
             self.obj.matrix_world = self.obj_orig.matrix_world
             self.me.update()
             
