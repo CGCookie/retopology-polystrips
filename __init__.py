@@ -457,7 +457,7 @@ class PolystripsUI:
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
                 common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_SMOOTH")
             
-            if False:
+            if settings.debug >= 2:
                 # draw bezier
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
                 p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
