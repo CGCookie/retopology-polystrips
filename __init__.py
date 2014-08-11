@@ -51,7 +51,7 @@ from mathutils.geometry import intersect_line_plane, intersect_point_line
 
 from lib import common_utilities
 from lib.common_utilities import get_object_length_scale, dprint, profiler, frange
-from lib.common_classes import SketchBrush
+from lib.common_classes import SketchBrush, MenuSearchPopup
 
 from lib import common_drawing
 
@@ -304,6 +304,8 @@ class PolystripsUI:
                                         event.mouse_region_x, event.mouse_region_y, 
                                         15, #settings.quad_prev_radius, 
                                         self.obj)
+        
+        self.search_menu = None #alternatively....create one, and just always update it and choose to draw it?
         
         self.sel_gedge = None                           # selected gedge
         self.sel_gvert = None                           # selected gvert
@@ -570,7 +572,9 @@ class PolystripsUI:
             color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
             common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
     
-            
+        if self.mode == 'search menu':
+            self.search_menu.draw(context)
+                
     def draw_callback_debug(self, context):
         settings = common_utilities.get_settings()
         region = context.region
@@ -1074,9 +1078,16 @@ class PolystripsUI:
             return 'cancel'
         
         
+        ##########################################
+        ## Search Popup ###
+        
+        if eventd['type'] in {'SPACE'}:
+            print(eventd['type'])
+            items = ['convert grease', 'convert selected','cycle node','delete','dissolve','grab','rip','relax','rotate','unlock','zipper']
+            self.search_menu = MenuSearchPopup(eventd['context'],500, 500, items)
+            return 'search menu'
         #####################################
         # general
-        
         if eventd['type'] == 'MOUSEMOVE':  #mouse movement/hovering
             #update brush and brush size
             x,y = eventd['mouse']
@@ -1603,7 +1614,33 @@ class PolystripsUI:
         
         return ''
     
-    
+    def modal_search(self,eventd):
+        x, y = eventd['mouse']
+        self.search_menu.modal_input_event(eventd)
+        if eventd['type'] not in {'MOUSEMOVE', 'TIMER'}:
+            print(eventd['type'])
+            
+        if eventd['type'] == 'MOUSEMOVE':
+            self.search_menu.pick_mouse(x,y)
+            return ''
+            #hover the menu
+            
+        if eventd['type'] == 'RET':
+            self.search_menu = None
+            return 'main'
+        
+        if eventd['type'] in {'RIGHTMOUSE', 'ESC'}:
+            self.search_menu = None
+            return 'main'
+        
+        if eventd['type'] == 'LEFTMOUSE':
+           if self.search_menu.pick_mouse(x,y):
+               self.search_menu = None
+               return 'main'
+           else:
+               self.search_menu = None
+               return 'main'
+           
     ###########################
     # main modal function (FSM)
     
@@ -1625,7 +1662,7 @@ class PolystripsUI:
         FSM['grab tool']    = self.modal_grab_tool
         FSM['rotate tool']  = self.modal_rotate_tool
         FSM['brush scale tool'] = self.modal_scale_brush_pixel_tool
-        
+        FSM['search menu']     = self.modal_search
         self.cur_pos = eventd['mouse']
         nmode = FSM[self.mode](eventd)
         self.mode_pos = eventd['mouse']
