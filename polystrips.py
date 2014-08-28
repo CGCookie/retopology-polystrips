@@ -274,6 +274,8 @@ class GVert:
             #          |          #
             #         ge0         #
             
+            # TODO: make this go CCW :P
+            
             def get_corner(self,dmx,dmy, igv0,r0, igv1,r1):
                 if not igv0 and not igv1:
                     return self.snap_pos + self.snap_tanx*self.radius*dmx + self.snap_tany*self.radius*dmy

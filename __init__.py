@@ -1247,14 +1247,14 @@ class PolystripsUI:
                 self.sel_gedge.gvert3.update_gedges()
                 return ''
             
-            if eventd['press']in {'CTRL+WHEELUPMOUSE', 'UP_ARROW'}:
+            if eventd['press']in {'CTRL+WHEELUPMOUSE', 'CTRL+NUMPAD_PLUS'}:
                 self.create_undo_snapshot('count')
                 self.sel_gedge.n_quads += 1
                 self.sel_gedge.force_count = True
                 self.sel_gedge.update()
                 return ''
             
-            if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'DOWN_ARROW'}:
+            if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'CTRL+NUMPAD_MINUS'}:
     
                 if self.sel_gedge.n_quads > 3:
                     self.create_undo_snapshot('count')
