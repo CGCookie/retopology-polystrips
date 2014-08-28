@@ -337,19 +337,22 @@ class PolystripsUI:
         p_data = copy.deepcopy(self.polystrips)
         
         if self.sel_gedge:
+            print('sel gedge at undo')
             sel_gedge = self.polystrips.gedges.index(self.sel_gedge)
         else:
-            sel_gedge = None
+            sel_gedge = -1
             
         if self.sel_gvert:
+            print('sel gvert at undo')
             sel_gvert = self.polystrips.gverts.index(self.sel_gvert)
         else:
-            sel_gvert = None
+            sel_gvert = -1
             
         if self.act_gvert:
+            print('act gvert at undo')
             act_gvert = self.polystrips.gverts.index(self.sel_gvert)
         else:
-            act_gvert = None
+            act_gvert = -1
             
         polystrips_undo_cache.append(([p_data, sel_gvert, sel_gedge, act_gvert], action))
             
@@ -365,17 +368,20 @@ class PolystripsUI:
             
             self.polystrips = data[0]
             
-            if data[1]:
+            if data[1] != -1:
+                print('selected gvert set after undo')
                 self.sel_gvert = self.polystrips.gverts[data[1]]
             else:
                 self.sel_gvert = None
                 
-            if data[2]:
+            if data[2] != -1:
+                print('selected gedge set after undo')
                 self.sel_gedge = self.polystrips.gedges[data[2]]
             else:
                 self.sel_gedge = None
                 
-            if data[3]:
+            if data[3] != -1:
+                print('act gvert set after undo')
                 self.act_gvert = self.polystrips.gverts[data[3]]
             else:
                 self.act_gvert = None
