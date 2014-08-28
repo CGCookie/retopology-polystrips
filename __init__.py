@@ -1247,14 +1247,14 @@ class PolystripsUI:
                 self.sel_gedge.gvert3.update_gedges()
                 return ''
             
-            if eventd['press']in {'CTRL+WHEELUPMOUSE', 'CTRL+NUMPAD_PLUS'}:
+            if eventd['press']in {'OSKEY+WHEELUPMOUSE', 'CTRL+NUMPAD_PLUS'}:
                 self.create_undo_snapshot('count')
                 self.sel_gedge.n_quads += 1
                 self.sel_gedge.force_count = True
                 self.sel_gedge.update()
                 return ''
             
-            if eventd['press'] in {'CTRL+WHEELDOWNMOUSE', 'CTRL+NUMPAD_MINUS'}:
+            if eventd['press'] in {'OSKEY+WHEELDOWNMOUSE', 'CTRL+NUMPAD_MINUS'}:
     
                 if self.sel_gedge.n_quads > 3:
                     self.create_undo_snapshot('count')
@@ -1706,7 +1706,8 @@ class PolystripsUI:
         event_ctrl    = 'CTRL+'  if event.ctrl  else ''
         event_shift   = 'SHIFT+' if event.shift else ''
         event_alt     = 'ALT+'   if event.alt   else ''
-        event_ftype   = event_ctrl + event_shift + event_alt + event.type
+        event_oskey   = 'OSKEY+' if event.oskey else ''
+        event_ftype   = event_ctrl + event_shift + event_alt + event_oskey + event.type
         
         event_pressure = 1 if not hasattr(event, 'pressure') else event.pressure
         
