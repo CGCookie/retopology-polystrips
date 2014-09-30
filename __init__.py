@@ -1052,7 +1052,7 @@ class PolystripsUI:
         return ''
     
     def modal_main(self, eventd):
-        self.footer = ''
+        self.footer = 'LMB: draw, RMB: select, G: grab, R: rotate, S: scale, F: brush size, K: knife, M: merge, CTRL+Wheel: adjust segments'
         
         #############################################
         # general navigation
