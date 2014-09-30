@@ -144,7 +144,18 @@ class CGCOOKIE_OT_retopo_polystrips_panel(bpy.types.Panel):
             col.label(text='No 2nd Object!')
         col.operator("cgcookie.polystrips", icon="IPO_BEZIER")
 
+##### name to be changed with a maintenance release to both Polystrips and Contours at same time ######
+class CGCOOKIE_OT_retopo_contour_menu(bpy.types.Menu):  
+    bl_label = "Retopology"
+    bl_space_type = 'VIEW_3D'
+    bl_idname = "object.retopology_menu"
 
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_context = 'INVOKE_DEFAULT'
+
+        layout.operator("cgcookie.polystrips")
 
 class CGCOOKIE_OT_polystrips(bpy.types.Operator):
     bl_idname = "cgcookie.polystrips"
@@ -188,6 +199,7 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
 
 def register():
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
+    bpy.utils.register_class(CGCOOKIE_OT_retopo_contour_menu)
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
     
@@ -203,6 +215,7 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
+    bpy.utils.unregister_class(CGCOOKIE_OT_retopo_contour_menu)
     bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
     
