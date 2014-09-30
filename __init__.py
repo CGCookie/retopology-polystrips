@@ -144,18 +144,21 @@ class CGCOOKIE_OT_retopo_polystrips_panel(bpy.types.Panel):
             col.label(text='No 2nd Object!')
         col.operator("cgcookie.polystrips", icon="IPO_BEZIER")
 
-##### name to be changed with a maintenance release to both Polystrips and Contours at same time ######
-class CGCOOKIE_OT_retopo_contour_menu(bpy.types.Menu):  
-    bl_label = "Retopology"
-    bl_space_type = 'VIEW_3D'
-    bl_idname = "object.retopology_menu"
+#### pending maintenance release of Contours ####
+# class CGCOOKIE_OT_retopo_menu(bpy.types.Menu):  
+#     bl_label = "Retopology"
+#     bl_space_type = 'VIEW_3D'
+#     bl_idname = "CGCookie_OT_retopology_menu"
 
-    def draw(self, context):
-        layout = self.layout
+#     def draw(self, context):
+#         layout = self.layout
 
-        layout.operator_context = 'INVOKE_DEFAULT'
+#         layout.operator_context = 'INVOKE_DEFAULT'
 
-        layout.operator("cgcookie.polystrips")
+#         layout.operator("cgcookie.polystrips")
+
+# def menu_func(self, context):
+#     self.layout.operator("cgcookie.polystrips")
 
 class CGCOOKIE_OT_polystrips(bpy.types.Operator):
     bl_idname = "cgcookie.polystrips"
@@ -199,30 +202,37 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
 
 def register():
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
-    bpy.utils.register_class(CGCOOKIE_OT_retopo_contour_menu)
-    bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
-    bpy.utils.register_class(PolystripsToolsAddonPreferences)
+    
+    #### comment for now until maintenance release of Contours ####
+    # if 'cgc-retopology-contours' not in bpy.context.user_preferences.addons:
+    #     bpy.utils.register_class(CGCOOKIE_OT_retopo_menu)
+    # else:
+    #     bpy.types.CGCookie_OT_retopology_menu.append(menu_func)
     
     # Create the addon hotkeys
-    kc = bpy.context.window_manager.keyconfigs.addon
+    # kc = bpy.context.window_manager.keyconfigs.addon
    
     # create the mode switch menu hotkey
-    km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
-    kmi = km.keymap_items.new('wm.call_menu', 'V', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.name = 'object.retopology_menu' 
-    kmi.active = True
-    polystrips_keymaps.append((km, kmi))
+    # km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
+    # kmi = km.keymap_items.new('wm.call_menu', 'V', 'PRESS', ctrl=True, shift=True)
+    # kmi.properties.name = 'CGCookie_OT_retopology_menu' 
+    # kmi.active = True
+    # polystrips_keymaps.append((km, kmi))
+
+    bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
+    bpy.utils.register_class(PolystripsToolsAddonPreferences)  
+
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
-    bpy.utils.unregister_class(CGCOOKIE_OT_retopo_contour_menu)
+    # bpy.utils.unregister_class(CGCOOKIE_OT_retopo_contour_menu)
     bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
     
-    # Remove addon hotkeys
-    for km, kmi in polystrips_keymaps:
-        km.keymap_items.remove(kmi)
-    polystrips_keymaps.clear()
+    # # Remove addon hotkeys
+    # for km, kmi in polystrips_keymaps:
+    #     km.keymap_items.remove(kmi)
+    # polystrips_keymaps.clear()
 
 
 
