@@ -191,27 +191,11 @@ def register():
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
     
-    # Create the addon hotkeys
-    kc = bpy.context.window_manager.keyconfigs.addon
-   
-    # create the mode switch menu hotkey
-    km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
-    kmi = km.keymap_items.new('wm.call_menu', 'V', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.name = 'object.retopology_menu' 
-    kmi.active = True
-    polystrips_keymaps.append((km, kmi))
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
     bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
-    
-    # Remove addon hotkeys
-    for km, kmi in polystrips_keymaps:
-        km.keymap_items.remove(kmi)
-    polystrips_keymaps.clear()
-
-
 
 
 class PolystripsUI:
