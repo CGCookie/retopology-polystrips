@@ -1163,7 +1163,7 @@ class PolystripsUI:
         return ''
     
     def modal_main(self, eventd):
-        self.footer = 'LMB: draw, RMB: select, G: grab, R: rotate, S: scale, F: brush size, K: knife, M: merge, CTRL+D: dissolve, CTRL+Wheel: adjust segments, CTRL+C: change selected junction type'
+        self.footer = 'LMB: draw, RMB: select, G: grab, R: rotate, S: scale, F: brush size, K: knife, M: merge, X: delete, CTRL+D: dissolve, CTRL+Wheel: adjust segments, CTRL+C: change selected junction type'
         
         #############################################
         # general navigation
