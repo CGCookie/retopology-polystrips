@@ -82,13 +82,18 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
     
     theme = EnumProperty(
         items=[
-            ('0','blue','blue'),
-            ('1','light orange','light orange'),
-            ('2','orange','orange')
+            ('blue', 'Blue', 'Blue color scheme'),
+            ('green', 'Green', 'Green color scheme'),
+            ('orange', 'Orange', 'Orange color scheme'),
             ],
         name='theme',
-        default='2'
+        default='blue'
         )
+
+    theme_colors = {
+        'blue': (0, 0, 255, 255) 
+    }
+
     
     show_segment_count = BoolProperty(
         name='Show Selected Segment Count',
@@ -423,11 +428,12 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
-        theme_number = int(settings.theme)
+        # theme_number = int(settings.theme)
         
+
         color_inactive  = (0,0,0)
-        color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
-        color_active    = [(156,236,255),(255,240,189),(255,217,120)][theme_number]     # not used at the moment
+        color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
+        color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
@@ -530,7 +536,7 @@ class PolystripsUI:
         if self.mode == 'brush scale tool':
             # scaling brush size
             self.sketch_brush.draw(context, color=(1,1,1,.5), linewidth=1, color_size=(1,1,1,1))
-        elif self.mode not in {'grab tool','scale tool','rotate tool'}:
+        elif self.mode not in {'grab tool','scale tool','rotate tool'} and not self.is_navigating:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
@@ -1021,14 +1027,14 @@ class PolystripsUI:
             self.post_update = True
             self.is_navigating = True
             
-            x,y = eventd['mouse']
-            self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
-            self.sketch_brush.make_circles()
-            self.sketch_brush.get_brush_world_size(eventd['context'])
+            # x,y = eventd['mouse']
+            # self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
+            # self.sketch_brush.make_circles()
+            # self.sketch_brush.get_brush_world_size(eventd['context'])
             
-            if self.sketch_brush.world_width:
-                self.stroke_radius = self.sketch_brush.world_width
-                self.stroke_radius_pressure = self.sketch_brush.world_width
+            # if self.sketch_brush.world_width:
+            #     self.stroke_radius = self.sketch_brush.world_width
+            #     self.stroke_radius_pressure = self.sketch_brush.world_width
                 
             return 'nav' if eventd['value']=='PRESS' else 'main'
         
