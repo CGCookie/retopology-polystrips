@@ -139,7 +139,7 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         layout = self.layout
         
         row = layout.row(align=True)
-        row.prop(self, "theme")
+        row.prop(self, "theme", "Theme")
         
         row = layout.row(align=True)
         row.prop(self, "show_segment_count")
