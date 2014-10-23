@@ -82,13 +82,22 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
     
     theme = EnumProperty(
         items=[
-            ('0','blue','blue'),
-            ('1','light orange','light orange'),
-            ('2','orange','orange')
+            ('blue', 'Blue', 'Blue color scheme'),
+            ('green', 'Green', 'Green color scheme'),
+            ('orange', 'Orange', 'Orange color scheme'),
             ],
         name='theme',
-        default='2'
+        default='blue'
         )
+    
+    def rgba_to_float(r, g, b, a):
+        return (r/255.0, g/255.0, b/255.0, a/255.0)
+
+    theme_colors = {
+        'blue': rgba_to_float(102, 165, 240, 255),
+        'green': rgba_to_float(105, 246, 113, 255),
+        'orange': rgba_to_float(254, 145, 0, 255)
+    }
     
     show_segment_count = BoolProperty(
         name='Show Selected Segment Count',
@@ -112,7 +121,7 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         layout = self.layout
         
         row = layout.row(align=True)
-        row.prop(self, "theme")
+        row.prop(self, "theme", "Theme")
         
         row = layout.row(align=True)
         row.prop(self, "show_segment_count")
@@ -423,18 +432,19 @@ class PolystripsUI:
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
         
-        theme_number = int(settings.theme)
+        # theme_number = int(settings.theme)
         
+
         color_inactive  = (0,0,0)
-        color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
-        color_active    = [(156,236,255),(255,240,189),(255,217,120)][theme_number]     # not used at the moment
+        color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
+        color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
-                color_border = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
-                color_fill   = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 0.20)
+                color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
-                color_border = (color_inactive[0]/255.0, color_inactive[1]/255.0, color_inactive[2]/255.0, 1.00)
+                color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
                 color_fill   = (0.5, 0.5, 0.5, 0.2)
             
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
@@ -458,10 +468,10 @@ class PolystripsUI:
             is_selected |= self.sel_gedge!=None and (self.sel_gedge.gvert0 == gv or self.sel_gedge.gvert1 == gv)
             is_selected |= self.sel_gedge!=None and (self.sel_gedge.gvert2 == gv or self.sel_gedge.gvert3 == gv)
             if is_selected:
-                color_border = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
-                color_fill   = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 0.20)
+                color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
-                color_border = (color_inactive[0]/255.0, color_inactive[1]/255.0, color_inactive[2]/255.0, 1.00)
+                color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
                 color_fill   = (0.5, 0.5, 0.5, 0.2)
             
             p3d = [p0,p1,p2,p3,p0]
@@ -469,11 +479,11 @@ class PolystripsUI:
             common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_SMOOTH")
         
         p3d = [gvert.position for gvert in self.polystrips.gverts if not gvert.is_unconnected() and gvert.is_visible()]
-        color = (color_inactive[0]/255.0, color_inactive[1]/255.0, color_inactive[2]/255.0, 1.00)
+        color = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
         common_drawing.draw_3d_points(context, p3d, color, 4)
         
         if self.sel_gvert:
-            color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
+            color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             gv = self.sel_gvert
             p0 = gv.position
             if gv.is_inner():
@@ -487,7 +497,7 @@ class PolystripsUI:
                     common_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
         
         if self.sel_gedge:
-            color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
+            color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             ge = self.sel_gedge
             if self.sel_gedge.is_zippered():
                 p3d = [ge.gvert0.position, ge.gvert3.position]
@@ -502,7 +512,7 @@ class PolystripsUI:
                 draw_gedge_info(self.sel_gedge, context)
         
         if self.act_gvert:
-            color = (color_active[0]/255.0, color_active[1]/255.0, color_active[2]/255.0, 1.00)
+            color = (color_active[0], color_active[1], color_active[2], 1.00)
             gv = self.act_gvert
             p0 = gv.position
             common_drawing.draw_3d_points(context, [p0], color, 8)
@@ -530,7 +540,7 @@ class PolystripsUI:
         if self.mode == 'brush scale tool':
             # scaling brush size
             self.sketch_brush.draw(context, color=(1,1,1,.5), linewidth=1, color_size=(1,1,1,1))
-        elif self.mode not in {'grab tool','scale tool','rotate tool'}:
+        elif self.mode not in {'grab tool','scale tool','rotate tool'} and not self.is_navigating:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
@@ -551,7 +561,7 @@ class PolystripsUI:
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
         if self.hover_ed and False:
-            color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
+            color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
     
             
@@ -1021,14 +1031,14 @@ class PolystripsUI:
             self.post_update = True
             self.is_navigating = True
             
-            x,y = eventd['mouse']
-            self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
-            self.sketch_brush.make_circles()
-            self.sketch_brush.get_brush_world_size(eventd['context'])
+            # x,y = eventd['mouse']
+            # self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
+            # self.sketch_brush.make_circles()
+            # self.sketch_brush.get_brush_world_size(eventd['context'])
             
-            if self.sketch_brush.world_width:
-                self.stroke_radius = self.sketch_brush.world_width
-                self.stroke_radius_pressure = self.sketch_brush.world_width
+            # if self.sketch_brush.world_width:
+            #     self.stroke_radius = self.sketch_brush.world_width
+            #     self.stroke_radius_pressure = self.sketch_brush.world_width
                 
             return 'nav' if eventd['value']=='PRESS' else 'main'
         
