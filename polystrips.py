@@ -402,7 +402,7 @@ class GVert:
         else:
             print('Cannot toggle corner on GVert with %i connections' % self.count_gedges())
     
-    def smooth(self, v=0.1):
+    def smooth(self, v=0.15):
         pr = profiler.start()
         
         der0 = self.gedge0.get_derivative_at(self, ignore_igverts=True).normalized() if self.gedge0 else Vector()
