@@ -474,6 +474,8 @@ class PolystripsUI:
         color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
         color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
         
+        bgl.glEnable(bgl.GL_POINT_SMOOTH)
+        
         for i_gp,gpatch in enumerate(self.polystrips.gpatches):
             l0 = len(gpatch.ge0.cache_igverts)
             l1 = len(gpatch.ge1.cache_igverts)
