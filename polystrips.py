@@ -33,12 +33,12 @@ import bmesh
 import blf, bgl
 import itertools
 
-from lib import common_utilities
-from lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator,frange
+from .lib import common_utilities
+from .lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator,frange
 
-from polystrips_utilities import *
-from polystrips_draw import *
-import polystrips_utilities
+from .polystrips_utilities import *
+from .polystrips_draw import *
+from . import polystrips_utilities
 
 #Make the addon name and location accessible
 AL = AddonLocator()
@@ -491,6 +491,8 @@ class GEdge:
         
         self.zip_attached   = []
         
+        self.gpatches = []
+        
         # create caching vars
         self.cache_igverts = []             # cached interval gverts
                                             # even-indexed igverts are poly "centers"
@@ -500,6 +502,33 @@ class GEdge:
         gvert1.connect_gedge_inner(self)
         gvert2.connect_gedge_inner(self)
         gvert3.connect_gedge(self)
+    
+    def get_count(self):
+        l = len(self.cache_igverts)
+        if l > 4:
+            n_quads = math.floor(l/2) + 1
+        else:
+            n_quads = 3
+        return n_quads
+    
+    def set_count(self, c):
+        if self.force_count and self.n_quads == c:
+            return
+        
+        self.force_count = True
+        self.n_quads = c
+        self.update()
+        
+        for gpatch in self.gpatches:
+            gpatch.set_count(self)
+            
+    def unset_count(self):
+        if self.fill_to0 or self.fill_to1:
+            print('Cannot unset force count when filling')
+            return
+        self.force_count = None
+        self.n_quads = None
+        self.update()
     
     def is_zippered(self): return (self.zip_to_gedge != None)
     def has_zippered(self): return len(self.zip_attached)!=0
@@ -537,6 +566,16 @@ class GEdge:
         self.gvert0.zip_over_gedge = None
         self.gvert3.zip_over_gedge = None
         self.update()
+    
+    def is_gpatched(self):
+        return len(self.gpatches)
+    
+    def attach_gpatch(self, gpatch):
+        if len(self.gpatches) == 2:
+            print('Cannot attach more than two gpatches')
+            return
+        self.gpatches += [gpatch]
+    
     
     def rotate_gverts_at(self, gv, quat):
         if gv == self.gvert0:
@@ -892,6 +931,9 @@ class GEdge:
         for zgedge in self.zip_attached:
             zgedge.update(debug=debug)
         
+        for gpatch in self.gpatches:
+            gpatch.update();
+        
     def snap_igverts(self):
         '''
         snaps already computed igverts to surface of object ob
@@ -950,6 +992,112 @@ class GEdge:
             prev0,prev1 = cur0,cur1
 
 
+class GPatch(object):
+    def __init__(self, ge0, ge1, ge2, ge3):
+        # TODO: allow multiple gedges per side!!
+        
+        self.ge0 = ge0
+        self.ge1 = ge1
+        self.ge2 = ge2
+        self.ge3 = ge3
+        
+        # attach gedge to gpatch
+        self.ge0.attach_gpatch(self)
+        self.ge1.attach_gpatch(self)
+        self.ge2.attach_gpatch(self)
+        self.ge3.attach_gpatch(self)
+        
+        # should the gedges be reversed?
+        self.rev0 = self.ge0.gvert3 in [self.ge1.gvert0, self.ge1.gvert3]
+        self.rev1 = self.ge1.gvert3 in [self.ge2.gvert0, self.ge2.gvert3]
+        self.rev2 = self.ge2.gvert3 in [self.ge3.gvert0, self.ge3.gvert3]
+        self.rev3 = self.ge3.gvert3 in [self.ge0.gvert0, self.ge0.gvert3]
+        
+        # make sure opposite gedges have same count
+        count02 = max(self.ge0.get_count(), self.ge2.get_count())
+        count13 = max(self.ge1.get_count(), self.ge3.get_count())
+        self.ge0.set_count(count02)
+        self.ge2.set_count(count02)
+        self.ge1.set_count(count13)
+        self.ge3.set_count(count13)
+        
+        
+        self.pts = []
+        
+    
+    def set_count(self, ge):
+        if ge == self.ge0:
+            self.ge2.set_count(ge.n_quads)
+        elif ge == self.ge1:
+            self.ge3.set_count(ge.n_quads)
+        elif ge == self.ge2:
+            self.ge0.set_count(ge.n_quads)
+        elif ge == self.ge3:
+            self.ge1.set_count(ge.n_quads)
+    
+    def iter_segments02(self):
+        segs0 = list(p.position for i,p in enumerate(self.ge0.cache_igverts) if i%2==1)
+        segs2 = list(p.position for i,p in enumerate(self.ge2.cache_igverts) if i%2==1)
+        
+        if self.rev0:
+            segs0 = reversed(segs0)
+        if not self.rev2:
+            segs2 = reversed(segs2)
+        
+        return zip(segs0,segs2)
+    
+    def iter_segments13(self):
+        segs1 = list(p.position for i,p in enumerate(self.ge1.cache_igverts) if i%2==1)
+        segs3 = list(p.position for i,p in enumerate(self.ge3.cache_igverts) if i%2==1)
+        
+        if self.rev1:
+            segs1 = reversed(segs1)
+        if not self.rev3:
+            segs3 = reversed(segs3)
+        
+        return zip(segs1,segs3)
+    
+    
+    def update(self):
+        cps0,ligv0 = self.ge0.gverts(),self.ge0.cache_igverts
+        cps1,ligv1 = self.ge1.gverts(),self.ge1.cache_igverts
+        cps2,ligv2 = self.ge2.gverts(),self.ge2.cache_igverts
+        cps3,ligv3 = self.ge3.gverts(),self.ge3.cache_igverts
+        
+        if self.rev0:
+            cps0 = list(reversed(cps0))
+            ligv0 = list(reversed(ligv0))
+        if self.rev1:
+            cps1 = list(reversed(cps1))
+            ligv1 = list(reversed(ligv1))
+        if not self.rev2:
+            cps2 = list(reversed(cps2))
+            ligv2 = list(reversed(ligv2))
+        if not self.rev3:
+            cps3 = list(reversed(cps3))
+            ligv3 = list(reversed(ligv3))
+        
+        v00,v01,v02,v03 = cps0
+        _,v13,v23,_ = cps1
+        v30,v31,v32,v33 = cps2
+        _,v20,v10,_ = cps3
+        v03,v02,v01,v00 = v00.position,v01.position,v02.position,v03.position
+        v33,v32,v31,v30 = v30.position,v31.position,v32.position,v33.position
+        v13,v23,v10,v20 = v13.position,v23.position,v10.position,v20.position
+        v11=v12=v21=v22 = (v00+v03+v33+v30)/4
+        
+        sz0 = len(ligv0)
+        sz1 = len(ligv1)
+        self.pts = []
+        for i0 in range(sz0):
+            for i1 in range(sz1):
+                #igv0,igv2 = ligv0[i],ligv2[i]
+                p0 = float(i0) / float(sz0)
+                p1 = float(i1) / float(sz1)
+                p = cubic_bezier_surface_t(v00,v01,v02,v03, v10,v11,v12,v13, v20,v21,v22,v23, v30,v31,v32,v33, p0,p1)
+                self.pts += [p]
+    
+
 class PolyStrips(object):
     def __init__(self, context, obj):
         settings = common_utilities.get_settings()
@@ -960,6 +1108,7 @@ class PolyStrips(object):
         # graph vertices and edges
         self.gverts = []
         self.gedges = []
+        self.gpatches = []
         
     
     def disconnect_gedge(self, gedge):
@@ -995,6 +1144,11 @@ class PolyStrips(object):
         ge.update()
         self.gedges += [ge]
         return ge
+    
+    def create_gpatch(self, ge0, ge1, ge2, ge3):
+        gp = GPatch(ge0, ge1, ge2, ge3)
+        self.gpatches += [gp]
+        return gp
     
     def closest_gedge_to_point(self, p):
         min_i,min_ge,min_t,min_d = -1,None,-1,0
@@ -1057,6 +1211,11 @@ class PolyStrips(object):
         gv_split.update_gedges()
         
         return (ge0,ge1,gv_split)
+    
+    def insert_gedge_between_gverts(self, gv0, gv3):
+        gv1 = self.create_gvert(gv0.position*0.7 + gv3.position*0.3)
+        gv2 = self.create_gvert(gv0.position*0.3 + gv3.position*0.7)
+        return self.create_gedge(gv0,gv1,gv2,gv3)
     
     def insert_gedge_from_stroke(self, stroke, only_ends, sgv0=None, sgv3=None, depth=0):
         '''
