@@ -526,10 +526,10 @@ class PolystripsUI:
         
         if self.mode == 'sketch':
             # draw smoothing line (end of sketch to current mouse position)
-            common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], color_active, 1, "GL_LINE_SMOOTH")
             
             # draw sketching stroke
-            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_STIPPLE")
+            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], color_selection, 2, "GL_LINE_STIPPLE")
             
             # report pressure reading
             info = str(round(self.sketch_pressure,3))
