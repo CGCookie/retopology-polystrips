@@ -232,7 +232,7 @@ class PolystripsUI:
         
         self._timer = context.window_manager.event_timer_add(0.1, context.window)
         
-        self.stroke_smoothing = 0.5          # 0: no smoothing. 1: no change
+        self.stroke_smoothing = 0.75          # 0: no smoothing. 1: no change
         
         if context.mode == 'OBJECT':
 
