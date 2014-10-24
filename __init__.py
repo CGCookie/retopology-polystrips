@@ -439,6 +439,8 @@ class PolystripsUI:
         color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
         color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
         
+        bgl.glEnable(bgl.GL_POINT_SMOOTH)
+        
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
