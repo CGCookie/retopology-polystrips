@@ -93,7 +93,12 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
     def rgba_to_float(r, g, b, a):
         return (r/255.0, g/255.0, b/255.0, a/255.0)
 
-    theme_colors = {
+    theme_colors_selection = {
+        'blue': rgba_to_float(105, 246, 113, 255),
+        'green': rgba_to_float(102, 165, 240, 255),
+        'orange': rgba_to_float(102, 165, 240, 255)
+    }
+    theme_colors_mesh = {
         'blue': rgba_to_float(102, 165, 240, 255),
         'green': rgba_to_float(105, 246, 113, 255),
         'orange': rgba_to_float(254, 145, 0, 255)
@@ -435,19 +440,19 @@ class PolystripsUI:
         # theme_number = int(settings.theme)
         
 
-        color_inactive  = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
-        color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
-        color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
+        color_inactive  = PolystripsToolsAddonPreferences.theme_colors_mesh[settings.theme]
+        color_selection = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]
+        color_active    = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]     # not used at the moment
         
         bgl.glEnable(bgl.GL_POINT_SMOOTH)
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.50)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+                color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.20)
             
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
@@ -471,10 +476,10 @@ class PolystripsUI:
             is_selected |= self.sel_gedge!=None and (self.sel_gedge.gvert2 == gv or self.sel_gedge.gvert3 == gv)
             if is_selected:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.50)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+                color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.20)
             
             p3d = [p0,p1,p2,p3,p0]
             common_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
