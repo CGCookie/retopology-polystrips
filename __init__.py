@@ -456,7 +456,7 @@ class PolystripsUI:
             
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
-                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_STIPPLE")
+                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 1, "GL_LINE_STIPPLE")
             
             if settings.debug >= 2:
                 # draw bezier
@@ -483,7 +483,7 @@ class PolystripsUI:
             
             p3d = [p0,p1,p2,p3,p0]
             common_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
-            common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_STIPPLE")
+            common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 1, "GL_LINE_STIPPLE")
         
         p3d = [gvert.position for gvert in self.polystrips.gverts if not gvert.is_unconnected() and gvert.is_visible()]
         color = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
