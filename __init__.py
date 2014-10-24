@@ -470,7 +470,7 @@ class PolystripsUI:
         # theme_number = int(settings.theme)
         
 
-        color_inactive  = (0,0,0)
+        color_inactive  = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
         color_selection = PolystripsToolsAddonPreferences.theme_colors[settings.theme]
         color_active    = PolystripsToolsAddonPreferences.theme_colors[settings.theme]     # not used at the moment
         
@@ -501,20 +501,20 @@ class PolystripsUI:
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.50)
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
-                color_fill   = (0.5, 0.5, 0.5, 0.2)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
-                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 2, "GL_LINE_STIPPLE")
             
             if settings.debug >= 2:
                 # draw bezier
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
                 p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
-                common_drawing.draw_polyline_from_3dpoints(context, p3d, (1,1,1,0.5),1, "GL_LINE_SMOOTH")
+                common_drawing.draw_polyline_from_3dpoints(context, p3d, (1,1,1,0.5),1, "GL_LINE_STIPPLE")
         
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
@@ -528,14 +528,14 @@ class PolystripsUI:
             is_selected |= self.act_gedge!=None and (self.act_gedge.gvert2 == gv or self.act_gedge.gvert3 == gv)
             if is_selected:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.50)
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
-                color_fill   = (0.5, 0.5, 0.5, 0.2)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             
             p3d = [p0,p1,p2,p3,p0]
             common_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
-            common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 2, "GL_LINE_STIPPLE")
         
         p3d = [gvert.position for gvert in self.polystrips.gverts if not gvert.is_unconnected() and gvert.is_visible()]
         color = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
@@ -581,7 +581,7 @@ class PolystripsUI:
             common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
             
             # draw sketching stroke
-            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
+            common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_STIPPLE")
             
             # report pressure reading
             info = str(round(self.sketch_pressure,3))
