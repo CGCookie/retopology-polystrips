@@ -491,6 +491,7 @@ class GEdge:
         
         self.zip_attached   = []
         
+        self.l_ts = []
         self.gpatches = []
         
         # create caching vars
@@ -517,11 +518,13 @@ class GEdge:
         
         self.force_count = True
         self.n_quads = c
+        
+        if self.gpatches:
+            for gpatch in self.gpatches:
+                gpatch.set_count(self)
+        
         self.update()
         
-        for gpatch in self.gpatches:
-            gpatch.set_count(self)
-            
     def unset_count(self):
         if self.fill_to0 or self.fill_to1:
             print('Cannot unset force count when filling')
@@ -908,6 +911,8 @@ class GEdge:
             self.n_quads = int((len(self.cache_igverts)+1)/2)
             
         
+        self.l_ts = l_ts
+        
         self.snap_igverts()
         
         self.gvert0.update(do_edges=False)
@@ -993,8 +998,10 @@ class GEdge:
 
 
 class GPatch(object):
-    def __init__(self, ge0, ge1, ge2, ge3):
+    def __init__(self, obj, ge0, ge1, ge2, ge3):
         # TODO: allow multiple gedges per side!!
+        
+        self.o_name = obj.name
         
         self.ge0 = ge0
         self.ge1 = ge1
@@ -1008,10 +1015,12 @@ class GPatch(object):
         self.ge3.attach_gpatch(self)
         
         # should the gedges be reversed?
-        self.rev0 = self.ge0.gvert3 in [self.ge1.gvert0, self.ge1.gvert3]
-        self.rev1 = self.ge1.gvert3 in [self.ge2.gvert0, self.ge2.gvert3]
-        self.rev2 = self.ge2.gvert3 in [self.ge3.gvert0, self.ge3.gvert3]
-        self.rev3 = self.ge3.gvert3 in [self.ge0.gvert0, self.ge0.gvert3]
+        self.rev0 = self.ge0.gvert0 in [self.ge1.gvert0, self.ge1.gvert3]
+        self.rev1 = self.ge1.gvert0 in [self.ge2.gvert0, self.ge2.gvert3]
+        self.rev2 = self.ge2.gvert0 in [self.ge3.gvert0, self.ge3.gvert3]
+        self.rev3 = self.ge3.gvert0 in [self.ge0.gvert0, self.ge0.gvert3]
+        
+        self.inside = (not self.rev0 and self.ge0.gvert3.gedge1==self.ge0) or (self.rev0 and self.ge0.gvert0.gedge1==self.ge0)
         
         # make sure opposite gedges have same count
         count02 = max(self.ge0.get_count(), self.ge2.get_count())
@@ -1021,9 +1030,8 @@ class GPatch(object):
         self.ge1.set_count(count13)
         self.ge3.set_count(count13)
         
-        
         self.pts = []
-        
+        self.update()
     
     def set_count(self, ge):
         if ge == self.ge0:
@@ -1034,6 +1042,7 @@ class GPatch(object):
             self.ge0.set_count(ge.n_quads)
         elif ge == self.ge3:
             self.ge1.set_count(ge.n_quads)
+        self.update()
     
     def iter_segments02(self):
         segs0 = list(p.position for i,p in enumerate(self.ge0.cache_igverts) if i%2==1)
@@ -1059,43 +1068,112 @@ class GPatch(object):
     
     
     def update(self):
-        cps0,ligv0 = self.ge0.gverts(),self.ge0.cache_igverts
-        cps1,ligv1 = self.ge1.gverts(),self.ge1.cache_igverts
-        cps2,ligv2 = self.ge2.gverts(),self.ge2.cache_igverts
-        cps3,ligv3 = self.ge3.gverts(),self.ge3.cache_igverts
+        mx = bpy.data.objects[self.o_name].matrix_world
+        mxnorm = mx.transposed().inverted().to_3x3()
+        mx3x3 = mx.to_3x3()
+        imx = mx.inverted()
+        
+        cps0,lts0 = self.ge0.gverts(),self.ge0.l_ts
+        cps1,lts1 = self.ge1.gverts(),self.ge1.l_ts
+        cps2,lts2 = self.ge2.gverts(),self.ge2.l_ts
+        cps3,lts3 = self.ge3.gverts(),self.ge3.l_ts
         
         if self.rev0:
             cps0 = list(reversed(cps0))
-            ligv0 = list(reversed(ligv0))
+            lts0 = [ 1-v for v in reversed(lts0)]
+            
         if self.rev1:
             cps1 = list(reversed(cps1))
-            ligv1 = list(reversed(ligv1))
+            lts1 = [ 1-v for v in reversed(lts1)]
+            
         if not self.rev2:
             cps2 = list(reversed(cps2))
-            ligv2 = list(reversed(ligv2))
+            lts2 = [ 1-v for v in reversed(lts2)]
+            
         if not self.rev3:
             cps3 = list(reversed(cps3))
-            ligv3 = list(reversed(ligv3))
+            lts3 = [ 1-v for v in reversed(lts3)]
+        
+        #          e0
+        #     0/0 1 2 3/0           00 01 02 03
+        # e3  1         1  e1       10 11 12 13
+        #     2         2           20 21 22 23
+        #     3/0 1 2 3/3           30 31 32 33
+        #          e2
         
         v00,v01,v02,v03 = cps0
-        _,v13,v23,_ = cps1
+        _,v13,v23,_     = cps1
+        _,v10,v20,_     = cps3
         v30,v31,v32,v33 = cps2
-        _,v20,v10,_ = cps3
-        v03,v02,v01,v00 = v00.position,v01.position,v02.position,v03.position
-        v33,v32,v31,v30 = v30.position,v31.position,v32.position,v33.position
-        v13,v23,v10,v20 = v13.position,v23.position,v10.position,v20.position
-        v11=v12=v21=v22 = (v00+v03+v33+v30)/4
         
-        sz0 = len(ligv0)
-        sz1 = len(ligv1)
+        assert cps0[0] == cps3[0]
+        assert cps0[3] == cps1[0]
+        assert cps2[0] == cps3[3]
+        assert cps2[3] == cps1[3]
+        
+        v00,v01,v02,v03 = v00.position,v01.position,v02.position,v03.position
+        v13,v23,v10,v20 = v13.position,v23.position,v10.position,v20.position
+        v30,v31,v32,v33 = v30.position,v31.position,v32.position,v33.position
+        
+        v11 = ( (v10*2/3+v13*1/3) + (v01*2/3+v31*1/3) )/2
+        v12 = ( (v10*1/3+v13*2/3) + (v02*2/3+v32*1/3) )/2
+        v21 = ( (v20*2/3+v23*1/3) + (v01*1/3+v31*2/3) )/2
+        v22 = ( (v20*1/3+v23*2/3) + (v02*1/3+v32*2/3) )/2
+        
+        lc0 = list(self.ge0.iter_segments())
+        idx0 =  (0,1) if (self.rev0==self.inside) else (3,2)
+        lc0 = [lc0[0][idx0[0]]] + list(_c[idx0[1]] for _c in lc0)
+        if self.rev0: lc0.reverse()
+        
+        lc1 = list(self.ge1.iter_segments())
+        idx1 =  (0,1) if (self.rev1==self.inside) else (3,2)
+        lc1 = [lc1[0][idx1[0]]] + list(_c[idx1[1]] for _c in lc1)
+        if self.rev1: lc1.reverse()
+        
+        lc2 = list(self.ge2.iter_segments())
+        idx2 =  (0,1) if (self.rev2==self.inside) else (3,2)
+        lc2 = [lc2[0][idx2[0]]] + list(_c[idx2[1]] for _c in lc2)
+        if not self.rev2: lc2.reverse()
+        
+        lc3 = list(self.ge3.iter_segments())
+        idx3 =  (0,1) if (self.rev3==self.inside) else (3,2)
+        lc3 = [lc3[0][idx3[0]]] + list(_c[idx3[1]] for _c in lc3)
+        if not self.rev3: lc3.reverse()
+        
+        sz0 = len(self.ge0.cache_igverts)
+        sz1 = len(self.ge1.cache_igverts)
+        
+        if len(lc0) != len(lc2):
+            # defer update for a bit
+            return
+        if len(lc1) != len(lc3):
+            return
+        
         self.pts = []
-        for i0 in range(sz0):
-            for i1 in range(sz1):
-                #igv0,igv2 = ligv0[i],ligv2[i]
-                p0 = float(i0) / float(sz0)
-                p1 = float(i1) / float(sz1)
-                p = cubic_bezier_surface_t(v00,v01,v02,v03, v10,v11,v12,v13, v20,v21,v22,v23, v30,v31,v32,v33, p0,p1)
-                self.pts += [p]
+        for i0 in range(1,sz0,2):
+            for i1 in range(1,sz1,2):
+                if i1 == 1:
+                    self.pts += [(i0,i1,lc0[(i0-1)//2])]
+                    continue
+                if i0 == sz0-2:
+                    self.pts += [(i0,i1,lc1[(i1-1)//2])]
+                    continue
+                if i1 == sz1-2:
+                    self.pts += [(i0,i1,lc2[(i0-1)//2])]
+                    continue
+                if i0 == 1:
+                    self.pts += [(i0,i1,lc3[(i1-1)//2])]
+                    continue
+                
+                p0 = i0 / (sz0-1)
+                p1 = i1 / (sz1-1)
+                p02 = lts0[i0]*(1-p1) + lts2[i0]*p1
+                p13 = lts1[i1]*p0 + lts3[i1]*(1-p0)
+                
+                p = cubic_bezier_surface_t(v00,v01,v02,v03, v10,v11,v12,v13, v20,v21,v22,v23, v30,v31,v32,v33, p02,p13)
+                l,n,i = bpy.data.objects[self.o_name].closest_point_on_mesh(imx * p)
+                p = mx * l
+                self.pts += [(i0,i1,p)]
     
 
 class PolyStrips(object):
@@ -1146,7 +1224,7 @@ class PolyStrips(object):
         return ge
     
     def create_gpatch(self, ge0, ge1, ge2, ge3):
-        gp = GPatch(ge0, ge1, ge2, ge3)
+        gp = GPatch(bpy.data.objects[self.o_name], ge0, ge1, ge2, ge3)
         self.gpatches += [gp]
         return gp
     

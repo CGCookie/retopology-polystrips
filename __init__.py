@@ -420,7 +420,18 @@ class PolystripsUI:
             self.draw_callback_debug(context)
     
         
-            
+    def draw_gedge_direction(self, context, gedge, color):
+        p0,p1,p2,p3 = gedge.gvert0.snap_pos,  gedge.gvert1.snap_pos,  gedge.gvert2.snap_pos,  gedge.gvert3.snap_pos
+        n0,n1,n2,n3 = gedge.gvert0.snap_norm, gedge.gvert1.snap_norm, gedge.gvert2.snap_norm, gedge.gvert3.snap_norm
+        pm = cubic_bezier_blend_t(p0,p1,p2,p3,0.5)
+        px = cubic_bezier_derivative(p0,p1,p2,p3,0.5).normalized()
+        pn = (n0+n3).normalized()
+        py = pn.cross(px).normalized()
+        rs = (gedge.gvert0.radius+gedge.gvert3.radius) * 0.35
+        rl = rs * 0.75
+        p3d = [pm-px*rs,pm+px*rs,pm+px*(rs-rl)+py*rl,pm+px*rs,pm+px*(rs-rl)-py*rl]
+        common_drawing.draw_polyline_from_3dpoints(context, p3d, color, 5, "GL_LINE_SMOOTH")
+    
     def draw_callback_themed(self, context):
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
@@ -431,14 +442,27 @@ class PolystripsUI:
         color_selection = [(  5,196,255),(255,206, 82),(255,183,  0)][theme_number]
         color_active    = [(156,236,255),(255,240,189),(255,217,120)][theme_number]     # not used at the moment
         
-        print('****************************')
-        print(inspect.getsourcefile(self.polystrips.__class__))
         for i_gp,gpatch in enumerate(self.polystrips.gpatches):
-            common_drawing.draw_3d_points(context, gpatch.pts, (1,1,1,0.5), 1)
-            #for c0,c1 in gpatch.iter_segments02():
-            #    common_drawing.draw_polyline_from_3dpoints(context, [c0,c1], (1,1,1,0.5), 1, "GL_LINE_SMOOTH")
-            #for c0,c1 in gpatch.iter_segments13():
-            #    common_drawing.draw_polyline_from_3dpoints(context, [c0,c1], (1,1,1,0.5), 1, "GL_LINE_SMOOTH")
+            l0 = len(gpatch.ge0.cache_igverts)
+            l1 = len(gpatch.ge1.cache_igverts)
+            for i0 in range(1,l0,2):
+                r = i0 / (l0-1)
+                c = (1,1,1,0.5) # (r,0,1,0.5)
+                pts = [p for _i0,_i1,p in gpatch.pts if _i0==i0]
+                common_drawing.draw_polyline_from_3dpoints(context, pts, c, 1, "GL_LINE_STIPPLE")
+            for i1 in range(1,l1,2):
+                g = i1 / (l1-1)
+                c = (1,1,1,0.5) # (0,g,1,0.5)
+                pts = [p for _i0,_i1,p in gpatch.pts if _i1==i1]
+                common_drawing.draw_polyline_from_3dpoints(context, pts, c, 1, "GL_LINE_STIPPLE")
+            common_drawing.draw_3d_points(context, [p for _,_,p in gpatch.pts], (1,1,1,0.5), 3)
+            
+            # draw edge directions
+            if settings.debug > 2:
+                self.draw_gedge_direction(context, gpatch.ge0, (0.8,0.4,0.4,1.0))
+                self.draw_gedge_direction(context, gpatch.ge1, (0.4,0.8,0.4,1.0))
+                self.draw_gedge_direction(context, gpatch.ge2, (0.4,0.4,0.8,1.0))
+                self.draw_gedge_direction(context, gpatch.ge3, (0.4,0.4,0.4,1.0))
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.act_gedge:
@@ -823,6 +847,10 @@ class PolystripsUI:
                 brgvert = rgedge.gvert0
             bgedge = self.polystrips.insert_gedge_between_gverts(blgvert, brgvert)
         
+        if not all(gv.is_ljunction for gv in [trgvert,tlgvert,blgvert,brgvert]):
+            print('All corners must be L-Junctions')
+            return
+        
         self.polystrips.create_gpatch(lgedge, bgedge, rgedge, tgedge)
         
     
@@ -1189,6 +1217,7 @@ class PolystripsUI:
             pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
             if not pts:
                 self.sel_gvert,self.act_gedge,self.act_gvert = None,None,None
+                self.sel_gedges.clear()
                 return ''
             pt = pts[0]
             
@@ -1228,6 +1257,7 @@ class PolystripsUI:
                 return ''
             
             self.act_gedge,self.sel_gvert = None,None
+            self.sel_gedges.clear()
             return ''
         
         if eventd['press'] == 'CTRL+LEFTMOUSE':                                     # delete/dissolve
