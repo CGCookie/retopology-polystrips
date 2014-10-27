@@ -66,6 +66,35 @@ polystrips_keymaps = []
 #used to store undo snapshots
 polystrips_undo_cache = []
 
+
+
+# http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Cookbook/Code_snippets/Interface
+class MessageOperator(bpy.types.Operator):
+    bl_idname = "error.message"
+    bl_label = "Message"
+    message = StringProperty()
+ 
+    def execute(self, context):
+        self.report({'INFO'}, self.message)
+        print(self.message)
+        return {'FINISHED'}
+ 
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_popup(self) #, width=400, height=200)
+ 
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row(align=True)
+        row.label("An error has occurred:")
+        row = layout.row(align=True)
+        row.label('    ' + self.message)
+    
+
+def showErrorMessage(message):
+    bpy.ops.error.message('INVOKE_DEFAULT', message=message)
+
+
 class PolystripsToolsAddonPreferences(AddonPreferences):
     bl_idname = __name__
     
@@ -187,6 +216,7 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
 
 
 def register():
+    bpy.utils.register_class(MessageOperator)
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
@@ -196,6 +226,8 @@ def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
     bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
+    bpy.utils.unregister_class(MessageOperator)
+
 
 
 class PolystripsUI:
@@ -319,7 +351,6 @@ class PolystripsUI:
                 print('repeatable...dont take snapshot')
                 return
         
-        return
         p_data = copy.deepcopy(self.polystrips)
         
         if self.act_gedge:
@@ -803,7 +834,9 @@ class PolystripsUI:
     # fill function
     
     def fill(self, eventd):
-        if len(self.sel_gedges) != 2: return
+        if len(self.sel_gedges) != 2:
+            showErrorMessage('Must have exactly 2 selected edges')
+            return
         
         # check that we have a hole
         # TODO: handle multiple edges on one side
@@ -831,7 +864,7 @@ class PolystripsUI:
                     bgedge = ge
         
         if not trgvert and not brgvert:
-            print('NOT HANDLED, YET!')
+            showErrorMessage('Selected edges must have at least one unselected edge between')
             return
         
         if not trgvert and brgvert:
@@ -848,7 +881,7 @@ class PolystripsUI:
             bgedge = self.polystrips.insert_gedge_between_gverts(blgvert, brgvert)
         
         if not all(gv.is_ljunction for gv in [trgvert,tlgvert,blgvert,brgvert]):
-            print('All corners must be L-Junctions')
+            showErrorMessage('All corners must be L-Junctions')
             return
         
         self.polystrips.create_gpatch(lgedge, bgedge, rgedge, tgedge)
@@ -1191,7 +1224,7 @@ class PolystripsUI:
         
         
         if eventd['press'] in {'LEFTMOUSE','SHIFT+LEFTMOUSE'}:
-            self.create_undo_snapshot('sketch')                   
+            self.create_undo_snapshot('sketch')
             # start sketching
             self.footer = 'Sketching'
             x,y = eventd['mouse']
@@ -1401,6 +1434,7 @@ class PolystripsUI:
         
         #if len(self.sel_gedges) > 2:
         if eventd['press'] == 'SHIFT+F':
+            self.create_undo_snapshot('simplefill')
             self.fill(eventd)
             
             return ''
