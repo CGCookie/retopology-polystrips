@@ -194,8 +194,8 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
-    bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
+    bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
 
 
 class PolystripsUI:
