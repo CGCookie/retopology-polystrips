@@ -73,6 +73,8 @@ class MessageOperator(bpy.types.Operator):
     bl_idname = "error.message"
     bl_label = "Message"
     message = StringProperty()
+    
+    lines = None
  
     def execute(self, context):
         self.report({'INFO'}, self.message)
@@ -84,15 +86,28 @@ class MessageOperator(bpy.types.Operator):
         return wm.invoke_popup(self) #, width=400, height=200)
  
     def draw(self, context):
+        if self.lines is None:
+            self.lines = self.message.split('\n')
+        
         layout = self.layout
-        row = layout.row(align=True)
-        row.label("An error has occurred:")
-        row = layout.row(align=True)
-        row.label('    ' + self.message)
+        layout.label("An error has occurred:")
+        for line in self.lines:
+            layout.label('    ' + line)
     
 
 def showErrorMessage(message):
-    bpy.ops.error.message('INVOKE_DEFAULT', message=message)
+    lines = []
+    while len(message) > 40:
+        i = message.rfind(' ',0,40)
+        if i == -1:
+            lines += [message[:40]]
+            message = message[40:]
+        else:
+            lines += [message[:i]]
+            message = message[i+1:]
+    if message:
+        lines += [message]
+    bpy.ops.error.message('INVOKE_DEFAULT', message='\n'.join(lines))
 
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
@@ -863,17 +878,27 @@ class PolystripsUI:
                     brgvert = ge.gvert0
                     bgedge = ge
         
+        # handle cases where selected gedges have no or only one connecting gedge
         if not trgvert and not brgvert:
-            showErrorMessage('Selected edges must have at least one unselected edge between')
-            return
-        
-        if not trgvert and brgvert:
+            # create two gedges
+            dl = (blgvert.position - tlgvert.position).normalized()
+            d0 = (rgedge.gvert0.position - tlgvert.position).normalized()
+            d3 = (rgedge.gvert3.position - tlgvert.position).normalized()
+            if dl.dot(d0) > dl.dot(d3):
+                trgvert = rgedge.gvert3
+                brgvert = rgedge.gvert0
+            else:
+                trgvert = rgedge.gvert0
+                brgvert = rgedge.gvert3
+            tgedge = self.polystrips.insert_gedge_between_gverts(tlgvert, trgvert)
+            bgedge = self.polystrips.insert_gedge_between_gverts(blgvert, brgvert)
+        elif not trgvert and brgvert:
             if brgvert == rgedge.gvert0:
                 trgvert = rgedge.gvert3
             else:
                 trgvert = rgedge.gvert0
             tgedge = self.polystrips.insert_gedge_between_gverts(tlgvert, trgvert)
-        if not brgvert and trgvert:
+        elif not brgvert and trgvert:
             if trgvert == rgedge.gvert0:
                 brgvert = rgedge.gvert3
             else:
