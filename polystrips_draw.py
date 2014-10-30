@@ -33,11 +33,11 @@ import blf
 import bgl
 import itertools
 
-from lib import common_utilities
-from lib import common_drawing
-from lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
+from .lib import common_utilities
+from .lib import common_drawing
+from .lib.common_utilities import iter_running_sum, dprint, get_object_length_scale, profiler, AddonLocator
 
-from polystrips_utilities import *
+from .polystrips_utilities import *
 
 
 #Make the addon name and location accessible
