@@ -326,8 +326,9 @@ class PolystripsUI:
                                         15, #settings.quad_prev_radius, 
                                         self.obj)
         
-        self.act_gedge  = None                          # active gedge
+        self.act_gedge  = set()                          # active gedge
         self.sel_gedges = set()
+        self.sel_gedge = set()
         self.sel_gvert  = None                          # selected gvert
         self.act_gvert  = None                          # active gvert (operated upon)
         
