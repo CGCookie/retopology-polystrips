@@ -326,7 +326,7 @@ class PolystripsUI:
                                         15, #settings.quad_prev_radius, 
                                         self.obj)
         
-        self.act_gedge  = set()                          # active gedge
+        self.act_gedge  = None                          # active gedge
         self.sel_gedges = set()
         self.sel_gedge = set()
         self.sel_gvert  = None                          # selected gvert
@@ -506,6 +506,9 @@ class PolystripsUI:
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
+                color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
+                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+            elif gedge == self.act_gedge:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
                 color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
@@ -1163,14 +1166,14 @@ class PolystripsUI:
             self.post_update = True
             self.is_navigating = True
             
-            # x,y = eventd['mouse']
-            # self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
-            # self.sketch_brush.make_circles()
-            # self.sketch_brush.get_brush_world_size(eventd['context'])
+            x,y = eventd['mouse']
+            self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
+            self.sketch_brush.make_circles()
+            self.sketch_brush.get_brush_world_size(eventd['context'])
             
-            # if self.sketch_brush.world_width:
-            #     self.stroke_radius = self.sketch_brush.world_width
-            #     self.stroke_radius_pressure = self.sketch_brush.world_width
+            if self.sketch_brush.world_width:
+                self.stroke_radius = self.sketch_brush.world_width
+                self.stroke_radius_pressure = self.sketch_brush.world_width
                 
             return 'nav' if eventd['value']=='PRESS' else 'main'
         
