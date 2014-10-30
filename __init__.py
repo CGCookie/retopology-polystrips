@@ -68,46 +68,24 @@ polystrips_undo_cache = []
 
 
 
-# http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Cookbook/Code_snippets/Interface
-class MessageOperator(bpy.types.Operator):
-    bl_idname = "error.message"
-    bl_label = "Message"
-    message = StringProperty()
-    
-    lines = None
- 
-    def execute(self, context):
-        self.report({'INFO'}, self.message)
-        print(self.message)
-        return {'FINISHED'}
- 
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_popup(self) #, width=400, height=200)
- 
-    def draw(self, context):
-        if self.lines is None:
-            self.lines = self.message.split('\n')
-        
-        layout = self.layout
-        layout.label("An error has occurred:")
-        for line in self.lines:
-            layout.label('    ' + line)
-    
-
-def showErrorMessage(message):
+def showErrorMessage(message, wrap=80):
     lines = []
-    while len(message) > 40:
-        i = message.rfind(' ',0,40)
-        if i == -1:
-            lines += [message[:40]]
-            message = message[40:]
-        else:
-            lines += [message[:i]]
-            message = message[i+1:]
+    if wrap > 0:
+        while len(message) > wrap:
+            i = message.rfind(' ',0,wrap)
+            if i == -1:
+                lines += [message[:wrap]]
+                message = message[wrap:]
+            else:
+                lines += [message[:i]]
+                message = message[i+1:]
     if message:
         lines += [message]
-    bpy.ops.error.message('INVOKE_DEFAULT', message='\n'.join(lines))
+    def draw(self,context):
+        for line in lines:
+            self.layout.label(line)
+    bpy.context.window_manager.popup_menu(draw, title="Error Message", icon="ERROR")
+    return
 
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
@@ -245,7 +223,6 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
 
 
 def register():
-    bpy.utils.register_class(MessageOperator)
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
@@ -353,6 +330,7 @@ class PolystripsUI:
         
         self.act_gedge  = None                          # active gedge
         self.sel_gedges = set()
+        self.sel_gedge = set()
         self.sel_gvert  = None                          # selected gvert
         self.act_gvert  = None                          # active gvert (operated upon)
         
@@ -505,6 +483,35 @@ class PolystripsUI:
         color_active    = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]     # not used at the moment
         
         bgl.glEnable(bgl.GL_POINT_SMOOTH)
+
+        for i_gp,gpatch in enumerate(self.polystrips.gpatches):
+
+            color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.50)
+
+            l0 = len(gpatch.ge0.cache_igverts)
+            l1 = len(gpatch.ge1.cache_igverts)
+
+            # Draw patch edges 
+            for i0 in range(1,l0,2):
+                r = i0 / (l0-1)
+                c = (1,1,1,0.5) # (r,0,1,0.5)
+                pts = [p for _i0,_i1,p in gpatch.pts if _i0==i0]
+                common_drawing.draw_polyline_from_3dpoints(context, pts, color_fill, 1, "GL_LINE_STIPPLE")
+            for i1 in range(1,l1,2):
+                g = i1 / (l1-1)
+                c = (1,1,1,0.5) # (0,g,1,0.5)
+                pts = [p for _i0,_i1,p in gpatch.pts if _i1==i1]
+                common_drawing.draw_polyline_from_3dpoints(context, pts, color_fill, 1, "GL_LINE_STIPPLE")
+            
+            # Draw patch vertices
+            common_drawing.draw_3d_points(context, [p for _,_,p in gpatch.pts], color_fill, 3)
+            
+            # draw edge directions
+            if settings.debug > 2:
+                self.draw_gedge_direction(context, gpatch.ge0, (0.8,0.4,0.4,1.0))
+                self.draw_gedge_direction(context, gpatch.ge1, (0.4,0.8,0.4,1.0))
+                self.draw_gedge_direction(context, gpatch.ge2, (0.4,0.4,0.8,1.0))
+                self.draw_gedge_direction(context, gpatch.ge3, (0.4,0.4,0.4,1.0))
         
         # Draw strips
         for i_ge,gedge in enumerate(self.polystrips.gedges):
