@@ -481,21 +481,28 @@ class PolystripsUI:
         color_active    = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]     # not used at the moment
         
         bgl.glEnable(bgl.GL_POINT_SMOOTH)
-        
+
         for i_gp,gpatch in enumerate(self.polystrips.gpatches):
+
+            color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.50)
+
             l0 = len(gpatch.ge0.cache_igverts)
             l1 = len(gpatch.ge1.cache_igverts)
+
+            # Draw patch edges 
             for i0 in range(1,l0,2):
                 r = i0 / (l0-1)
                 c = (1,1,1,0.5) # (r,0,1,0.5)
                 pts = [p for _i0,_i1,p in gpatch.pts if _i0==i0]
-                common_drawing.draw_polyline_from_3dpoints(context, pts, c, 1, "GL_LINE_STIPPLE")
+                common_drawing.draw_polyline_from_3dpoints(context, pts, color_fill, 1, "GL_LINE_STIPPLE")
             for i1 in range(1,l1,2):
                 g = i1 / (l1-1)
                 c = (1,1,1,0.5) # (0,g,1,0.5)
                 pts = [p for _i0,_i1,p in gpatch.pts if _i1==i1]
-                common_drawing.draw_polyline_from_3dpoints(context, pts, c, 1, "GL_LINE_STIPPLE")
-            common_drawing.draw_3d_points(context, [p for _,_,p in gpatch.pts], (1,1,1,0.5), 3)
+                common_drawing.draw_polyline_from_3dpoints(context, pts, color_fill, 1, "GL_LINE_STIPPLE")
+            
+            # Draw patch vertices
+            common_drawing.draw_3d_points(context, [p for _,_,p in gpatch.pts], color_fill, 3)
             
             # draw edge directions
             if settings.debug > 2:
