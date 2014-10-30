@@ -68,46 +68,24 @@ polystrips_undo_cache = []
 
 
 
-# http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Cookbook/Code_snippets/Interface
-class MessageOperator(bpy.types.Operator):
-    bl_idname = "error.message"
-    bl_label = "Message"
-    message = StringProperty()
-    
-    lines = None
- 
-    def execute(self, context):
-        self.report({'INFO'}, self.message)
-        print(self.message)
-        return {'FINISHED'}
- 
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_popup(self) #, width=400, height=200)
- 
-    def draw(self, context):
-        if self.lines is None:
-            self.lines = self.message.split('\n')
-        
-        layout = self.layout
-        layout.label("An error has occurred:")
-        for line in self.lines:
-            layout.label('    ' + line)
-    
-
-def showErrorMessage(message):
+def showErrorMessage(message, wrap=80):
     lines = []
-    while len(message) > 40:
-        i = message.rfind(' ',0,40)
-        if i == -1:
-            lines += [message[:40]]
-            message = message[40:]
-        else:
-            lines += [message[:i]]
-            message = message[i+1:]
+    if wrap > 0:
+        while len(message) > wrap:
+            i = message.rfind(' ',0,wrap)
+            if i == -1:
+                lines += [message[:wrap]]
+                message = message[wrap:]
+            else:
+                lines += [message[:i]]
+                message = message[i+1:]
     if message:
         lines += [message]
-    bpy.ops.error.message('INVOKE_DEFAULT', message='\n'.join(lines))
+    def draw(self,context):
+        for line in lines:
+            self.layout.label(line)
+    bpy.context.window_manager.popup_menu(draw, title="Error Message", icon="ERROR")
+    return
 
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
@@ -231,7 +209,6 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
 
 
 def register():
-    bpy.utils.register_class(MessageOperator)
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
@@ -239,9 +216,8 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
-    bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
     bpy.utils.unregister_class(CGCOOKIE_OT_retopo_polystrips_panel)
-    bpy.utils.unregister_class(MessageOperator)
+    bpy.utils.unregister_class(CGCOOKIE_OT_polystrips)
 
 
 
