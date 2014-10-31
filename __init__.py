@@ -328,7 +328,6 @@ class PolystripsUI:
         
         self.act_gedge  = None                          # active gedge
         self.sel_gedges = set()
-        self.sel_gedge = set()
         self.sel_gvert  = None                          # selected gvert
         self.act_gvert  = None                          # active gvert (operated upon)
         
@@ -512,7 +511,7 @@ class PolystripsUI:
                 self.draw_gedge_direction(context, gpatch.ge3, (0.4,0.4,0.4,1.0))
         
         for i_ge,gedge in enumerate(self.polystrips.gedges):
-            if gedge == self.sel_gedge:
+            if gedge in self.sel_gedges:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
                 color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             elif gedge == self.act_gedge:
@@ -571,10 +570,10 @@ class PolystripsUI:
                 for p1 in p3d:
                     common_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
         
-        if self.sel_gedge:
+        if self.act_gedge:
             color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-            ge = self.sel_gedge
-            if self.sel_gedge.is_zippered():
+            ge = self.act_gedge
+            if self.act_gedge.is_zippered():
                 p3d = [ge.gvert0.position, ge.gvert3.position]
                 common_drawing.draw_3d_points(context, p3d, color, 8)
             else:
