@@ -1545,14 +1545,14 @@ class PolystripsUI:
                 
                 #get GV0 of the first Gedge created after stroke
                 #assumes gedges are created from tip to tail, even with intersections
-                GV0 = self.polystrips.gedges[n].gvert0
+                GV0 = self.polystrips.gedges[-1].gvert0
                 GV0.extension_edge = self.hover_ed.index
                 GV0.extension_edge_v0 = v0
                 GV0.extension_edge_v1 = v1
                 GV0.update()
                 
-                if len(self.polystrips.gedges[n].cache_igverts):
-                    gv0 = self.polystrips.gedges[n].cache_igverts[0]
+                if len(self.polystrips.gedges[-1].cache_igverts):
+                    gv0 = self.polystrips.gedges[-1].cache_igverts[0]
                     gv0.extension_edge = self.hover_ed.index
                     gv0.extension_edge_v0 = v0
                     gv0.extension_edge_v1 = v1

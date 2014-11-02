@@ -332,6 +332,8 @@ class GVert:
             for corner_ind in [corner_ind0, corner_ind1]:
 
                 min_d = snap[corner_ind]
+                if min_d > self.radius: 
+                    continue
                 ds = dists[corner_ind]
                 ind = ds.index(min_d)
                 if ind == 0:
