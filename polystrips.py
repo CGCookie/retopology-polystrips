@@ -46,9 +46,10 @@ AL = AddonLocator()
 
 
 class GVert:
-    def __init__(self, obj, length_scale, position, radius, normal, tangent_x, tangent_y):
+    def __init__(self, obj, targ_obj, length_scale, position, radius, normal, tangent_x, tangent_y):
         # store info
         self.o_name       = obj.name
+        self.targ_o_name  = targ_obj.name
         self.length_scale = length_scale
         
         self.position  = position
@@ -77,17 +78,26 @@ class GVert:
         
         self.visible = True
         
+        self.extension_edge = -1  #will reference an index so that deepcopy works
+        self.extension_edge_v0 = Vector((0,0,0))  #these must be set outside with reference to bmedge
+        self.extension_edge_v1 = Vector((0,0,0))
+        
         self.update()
     
     def clone_detached(self):
         '''
         creates detached clone of gvert (without gedges)
         '''
-        gv = GVert(bpy.data.objects[self.o_name], self.length_scale, Vector(self.position), self.radius, Vector(self.normal), Vector(self.tangent_x), Vector(self.tangent_y))
+        gv = GVert(bpy.data.objects[self.o_name], bpy.data.objects[self.targ_o_name], self.length_scale, Vector(self.position), self.radius, Vector(self.normal), Vector(self.tangent_x), Vector(self.tangent_y))
         gv.snap_pos = Vector(self.snap_pos)
         gv.snap_norm = Vector(self.snap_norm)
         gv.snap_tanx = Vector(self.snap_tanx)
         gv.snap_tany = Vector(self.snap_tany)
+        
+        gv.extension_edge = self.extension_edge
+        gv.extension_edge_v0 = self.extension_edge_v0
+        gv.extension_edge_v1 = self.extension_edge_v1
+        
         return gv
     
     def has_0(self): return not (self.gedge0 is None)
@@ -302,6 +312,48 @@ class GVert:
         
         self.snap_corners()
         
+        ####snapping to existing bmedge####
+        if self.extension_edge != -1:
+            print('we are snapping')
+            ### TODO  Make this look like code and not all this list searching crap###
+            dists = [[(self.extension_edge_v0 - self.corner0).length, (self.extension_edge_v1 - self.corner0).length],
+                  [(self.extension_edge_v0 - self.corner1).length, (self.extension_edge_v1 - self.corner1).length],
+                  [(self.extension_edge_v0 - self.corner2).length, (self.extension_edge_v1 - self.corner2).length],
+                  [(self.extension_edge_v0 - self.corner3).length, (self.extension_edge_v1 - self.corner3).length]]
+            
+            snap = [min(d) for d in dists]
+            print(snap)
+            best_snaps = snap.copy()
+            best_snaps.sort()
+            
+            corner_ind0 = snap.index(best_snaps[0])
+            corner_ind1 = snap.index(best_snaps[1]) 
+            
+            for corner_ind in [corner_ind0, corner_ind1]:
+
+                min_d = snap[corner_ind]
+                ds = dists[corner_ind]
+                ind = ds.index(min_d)
+                if ind == 0:
+                    if corner_ind == 0:
+                        self.corner0 = self.extension_edge_v0
+                    elif corner_ind == 1: 
+                        self.corner1 = self.extension_edge_v0
+                    elif corner_ind == 2:
+                        self.corner2 = self.extension_edge_v0
+                    else:
+                        self.corner3 = self.extension_edge_v0
+                        
+                else:
+                    if corner_ind == 0:
+                        self.corner0 = self.extension_edge_v1
+                    elif corner_ind == 1: 
+                        self.corner1 = self.extension_edge_v1
+                    elif corner_ind == 2:
+                        self.corner2 = self.extension_edge_v1
+                    else:
+                        self.corner3 = self.extension_edge_v1
+                    
         pr.done()
     
     def update_corners_zip(self, p0, p1, p2, p3):
@@ -473,9 +525,10 @@ class GEdge:
     '''
     Graph Edge (GEdge) stores end points and "way points" (cubic bezier)
     '''
-    def __init__(self, obj, length_scale, gvert0, gvert1, gvert2, gvert3):
+    def __init__(self, obj, targ_obj, length_scale, gvert0, gvert1, gvert2, gvert3):
         # store end gvertices
         self.o_name = obj.name
+        self.targ_o_name = targ_obj.name
         self.length_scale = length_scale
         self.gvert0 = gvert0
         self.gvert1 = gvert1
@@ -716,7 +769,10 @@ class GEdge:
             l_tanx  = [oigv.tangent_x*zdir for _i,oigv in enumerate(loigv)]
             l_tany  = [oigv.tangent_y*zdir for _i,oigv in enumerate(loigv)]
             
-            self.cache_igverts = [GVert(bpy.data.objects[self.o_name],self.length_scale,p,r,n,tx,ty) for p,r,n,tx,ty in zip(l_pos,l_radii,l_norms,l_tanx,l_tany)]
+            self.cache_igverts = [GVert(bpy.data.objects[self.o_name],
+                                        bpy.data.objects[self.targ_o_name],
+                                        self.length_scale,p,r,n,tx,ty) 
+                                  for p,r,n,tx,ty in zip(l_pos,l_radii,l_norms,l_tanx,l_tany)]
             self.snap_igverts()
             
             assert len(self.cache_igverts)>=2, 'not enough! %i (%f) %i (%f) %i' % (i0,t0,i3,t3,ic)
@@ -864,7 +920,10 @@ class GEdge:
         l_tany  = [t.cross(n).normalized() for t,n in zip(l_tanx,l_norms)]
         
         # create igverts!
-        self.cache_igverts = [GVert(bpy.data.objects[self.o_name],self.length_scale,p,r,n,tx,ty) for p,r,n,tx,ty in zip(l_pos,l_radii,l_norms,l_tanx,l_tany)]
+        self.cache_igverts = [GVert(bpy.data.objects[self.o_name],
+                                    bpy.data.objects[self.targ_o_name],
+                                    self.length_scale,p,r,n,tx,ty) 
+                              for p,r,n,tx,ty in zip(l_pos,l_radii,l_norms,l_tanx,l_tany)]
         if not self.force_count:
             self.n_quads = int((len(self.cache_igverts)+1)/2)
             
@@ -951,10 +1010,12 @@ class GEdge:
 
 
 class PolyStrips(object):
-    def __init__(self, context, obj):
+    def __init__(self, context, obj, targ_obj):
         settings = common_utilities.get_settings()
         
         self.o_name = obj.name
+        self.targ_o_name =targ_obj.name
+        
         self.length_scale = get_object_length_scale(bpy.data.objects[self.o_name])
         
         # graph vertices and edges
@@ -986,12 +1047,14 @@ class PolyStrips(object):
         n0  = Vector((0,0,1))
         tx0 = Vector((1,0,0))
         ty0 = Vector((0,1,0))
-        gv = GVert(bpy.data.objects[self.o_name],self.length_scale,p0,r0,n0,tx0,ty0)
+        gv = GVert(bpy.data.objects[self.o_name],
+                   bpy.data.objects[self.targ_o_name],
+                   self.length_scale,p0,r0,n0,tx0,ty0)
         self.gverts += [gv]
         return gv
     
     def create_gedge(self, gv0, gv1, gv2, gv3):
-        ge = GEdge(bpy.data.objects[self.o_name], self.length_scale, gv0, gv1, gv2, gv3)
+        ge = GEdge(bpy.data.objects[self.o_name], bpy.data.objects[self.targ_o_name], self.length_scale, gv0, gv1, gv2, gv3)
         ge.update()
         self.gedges += [ge]
         return ge

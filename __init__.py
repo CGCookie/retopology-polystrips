@@ -241,11 +241,18 @@ class PolystripsUI:
             bpy.ops.object.mode_set(mode = 'EDIT')
             bpy.ops.object.mode_set(mode = 'OBJECT')
             
+            #Bmesh to operate on
             self.bme = bmesh.new()
             self.bme.from_mesh(self.me)
             
-            self.to_obj = None
-            self.to_bme = None
+            #Create a new empty destination object for new retopo mesh
+            nm_polystrips = self.obj.name + "_polystrips"
+            self.dest_bme = bmesh.new()
+            dest_me  = bpy.data.meshes.new(nm_polystrips)
+            self.dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
+            self.dest_obj.matrix_world = self.obj.matrix_world
+            context.scene.objects.link(self.dest_obj)
+            
             self.snap_eds = []
             self.snap_eds_vis = []
             self.hover_ed = None
@@ -266,11 +273,11 @@ class PolystripsUI:
             bpy.ops.object.mode_set(mode = 'OBJECT')
             bpy.ops.object.mode_set(mode = 'EDIT')
             
-            self.to_obj = context.object
-            self.to_bme = bmesh.from_edit_mesh(context.object.data)
-            self.snap_eds = [ed for ed in self.to_bme.edges if not ed.is_manifold]
+            self.dest_obj = context.object
+            self.dest_bme = bmesh.from_edit_mesh(context.object.data)
+            self.snap_eds = [ed for ed in self.dest_bme.edges if not ed.is_manifold]
             region,r3d = context.region,context.space_data.region_3d
-            mx = self.to_obj.matrix_world
+            mx = self.dest_obj.matrix_world
             rv3d = context.space_data.region_3d
             self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, rv3d) for ed in self.snap_eds]
             self.hover_ed = None
@@ -293,7 +300,7 @@ class PolystripsUI:
         self.sel_gvert = None                           # selected gvert
         self.act_gvert = None                           # active gvert (operated upon)
         
-        self.polystrips = PolyStrips(context, self.obj)
+        self.polystrips = PolyStrips(context, self.obj, self.dest_obj)
         
         polystrips_undo_cache = []  #clear the cache in case any is left over
         if self.obj.grease_pencil:
@@ -550,9 +557,9 @@ class PolystripsUI:
                     hit_norm = mxnorm * hit_norm
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
         
-        if self.hover_ed and False:
+        if self.hover_ed:  #and False removed to allow existing edge highlighting
             color = (color_selection[0]/255.0, color_selection[1]/255.0, color_selection[2]/255.0, 1.00)
-            common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
+            common_drawing.draw_bmedge(context, self.hover_ed, self.dest_obj.matrix_world, 2, color)
     
             
     def draw_callback_debug(self, context):
@@ -710,7 +717,7 @@ class PolystripsUI:
         if not self.hover_ed:
             self.sketch_brush.draw(context)
         else:
-            common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color_selected)
+            common_drawing.draw_bmedge(context, self.hover_ed, self.dest_obj.matrix_world, 2, color_selected)
     
     
     ############################
@@ -719,59 +726,49 @@ class PolystripsUI:
     def create_mesh(self, context):
         verts,quads = self.polystrips.create_mesh()
         
-        if self.to_bme and self.to_obj:  #EDIT MDOE on Existing Mesh
-            bm = self.to_bme
-            mx = self.to_obj.matrix_world
+        if 'EDIT' in context.mode:  #self.dest_bme and self.dest_obj:  #EDIT MDOE on Existing Mesh
+            mx = self.dest_obj.matrix_world
             imx = mx.inverted()
-            
             mx2 = self.obj.matrix_world
-            imx2 = mx2.inverted()
             
         else:
-            bm = bmesh.new()
             mx2 = Matrix.Identity(4)
-            imx = Matrix.Identity(4)
-            
-            nm_polystrips = self.obj.name + "_polystrips"
-        
-            dest_me  = bpy.data.meshes.new(nm_polystrips)
-            dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
-        
-            dest_obj.matrix_world = self.obj.matrix_world
-            dest_obj.update_tag()
-            dest_obj.show_all_edges = True
-            dest_obj.show_wire      = True
-            dest_obj.show_x_ray     = True
-            
-            context.scene.objects.link(dest_obj)
-            dest_obj.select = True
-            context.scene.objects.active = dest_obj
+            imx = Matrix.Identity(4)  #in reality, mx2 and imx are inverses so they cancel
+
+            self.dest_obj.update_tag()
+            self.dest_obj.show_all_edges = True
+            self.dest_obj.show_wire      = True
+            self.dest_obj.show_x_ray     = True
+         
+            self.dest_obj.select = True
+            context.scene.objects.active = self.dest_obj
             
         
-        bmverts = [bm.verts.new(imx * mx2 * v) for v in verts]
-        bm.verts.index_update()
-        for q in quads: bm.faces.new([bmverts[i] for i in q])
+        bmverts = [self.dest_bme.verts.new(imx * mx2 * v) for v in verts]
+        self.dest_bme.verts.index_update()
+        for q in quads: self.dest_bme.faces.new([bmverts[i] for i in q])
+        self.dest_bme.faces.index_update()
         
-        bm.faces.index_update()
+        if 'EDIT' in context.mode: #self.dest_bme and self.dest_obj:
+            bmesh.update_edit_mesh(self.dest_obj.data, tessface=False, destructive=True)
         
-        if self.to_bme and self.to_obj:
-            bmesh.update_edit_mesh(self.to_obj.data, tessface=False, destructive=True)
-            bm.free()
         else: 
-            bm.to_mesh(dest_me)
-            bm.free()
+            self.dest_bme.to_mesh(self.dest_obj.data)
+        
+        self.dest_bme.free()
         
     ###########################
     # hover functions
     
     def hover_geom(self,eventd):
+        print('hover geom')
         if not len(self.snap_eds): return 
         context = eventd['context']
         region,r3d = context.region,context.space_data.region_3d
         new_matrix = [v for l in r3d.view_matrix for v in l]
         x, y = eventd['mouse']
         mouse_loc = Vector((x,y))
-        mx = self.to_obj.matrix_world
+        mx = self.dest_obj.matrix_world
         
         if self.post_update or self.last_matrix != new_matrix:
             #update all the visibility stuff
@@ -1062,18 +1059,32 @@ class PolystripsUI:
         # general
         
         if eventd['type'] == 'MOUSEMOVE':  #mouse movement/hovering
+            self.hover_geom(eventd)
+            
+
+
             #update brush and brush size
             x,y = eventd['mouse']
             self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
-            self.sketch_brush.make_circles()
-            self.sketch_brush.get_brush_world_size(eventd['context'])
             
-            if self.sketch_brush.world_width:
-                self.stroke_radius = self.sketch_brush.world_width
-                self.stroke_radius_pressure = self.sketch_brush.world_width
+            #grab brush size from existing geom
+            if self.hover_ed:
+                ed_vector = self.obj.matrix_world * self.hover_ed.verts[1].co - self.obj.matrix_world * self.hover_ed.verts[0].co
+                R = .5 * ed_vector.length
+                self.sketch_brush.world_width = R
+                self.stroke_radius = R
+                self.stroke_radius_pressure = R
             
-            self.hover_geom(eventd)
-        
+            else: #generate brush size from pixel size
+                self.sketch_brush.make_circles()
+                self.sketch_brush.get_brush_world_size(eventd['context'])
+            
+                if self.sketch_brush.world_width:
+                    self.stroke_radius = self.sketch_brush.world_width
+                    self.stroke_radius_pressure = self.sketch_brush.world_width
+            
+            
+            
         
         if eventd['press'] == 'CTRL+Z':
             self.undo_action()
@@ -1107,7 +1118,15 @@ class PolystripsUI:
             
             self.sketch_curpos = (x,y)
             
-            if eventd['shift'] and self.sel_gvert:
+            if self.hover_ed:
+                ed_vector = self.obj.matrix_world * self.hover_ed.verts[1].co - self.obj.matrix_world * self.hover_ed.verts[0].co
+                R = .5 * ed_vector.length
+                self.sketch_brush.world_width = R
+                self.stroke_radius = R
+                self.stroke_radius_pressure = R
+                self.sketch = [((x,y),R)]
+                
+            elif eventd['shift'] and self.sel_gvert:
                 # continue sketching from selected gvert position
                 gvx,gvy = location_3d_to_region_2d(eventd['region'], eventd['r3d'], self.sel_gvert.position)
                 self.sketch = [((gvx,gvy),self.sel_gvert.radius), ((x,y),r)]
@@ -1458,7 +1477,8 @@ class PolystripsUI:
 
             ss0,ss1 = self.stroke_smoothing,1-self.stroke_smoothing
             #smooth radii
-            self.stroke_radius_pressure = lr*ss0 + r*ss1
+            if not self.hover_ed:
+                self.stroke_radius_pressure = lr*ss0 + r*ss1
             
             self.sketch += [((lx*ss0+x*ss1, ly*ss0+y*ss1), self.stroke_radius_pressure)]
             
@@ -1479,12 +1499,65 @@ class PolystripsUI:
             #p3d = [(p0+(p1-p0).normalized()*x) for p0,p1 in zip(p3d[:-1],p3d[1:]) for x in frange(0,(p0-p1).length,length_tess)] + [p3d[-1]]
             #stroke = [(p,self.stroke_radius) for i,p in enumerate(p3d)]
             
+            
+            
+            #post process stroke if extruding from existing edge
+            if self.hover_ed:
+                n = len(self.polystrips.gedges)
+                mx = self.obj_orig.matrix_world
+                vector_path = [p[0] for p in p3d]  #ignore pressure values
+                
+                ed_midpoint = 0.5 * self.obj.matrix_world * self.hover_ed.verts[1].co + 0.5 * self.obj.matrix_world * self.hover_ed.verts[0].co
+                ed_vector = self.obj.matrix_world * self.hover_ed.verts[1].co - self.obj.matrix_world * self.hover_ed.verts[0].co
+                ed_vector.normalize()
+                
+                surface_midpoint, surface_normal, ind = self.obj_orig.closest_point_on_mesh(mx.inverted() * ed_midpoint)
+            
+                world_normal = mx.transposed().inverted().to_3x3() * surface_normal
+                
+                tangent_v = world_normal.cross(ed_vector)
+                tangent_v.normalize()
+                
+                stroke_dir = vector_path[2] - vector_path[0]  #TODO, find point that is s = R/2 length and use that to determine direction.
+                stroke_dir.normalize()
+                
+                if tangent_v.dot(stroke_dir) < 0:
+                    tangent_v = -1*tangent_v
+                
+                target_snap_point = ed_midpoint + self.stroke_radius * tangent_v
+                surface_snap  = mx * self.obj_orig.closest_point_on_mesh(mx.inverted() * target_snap_point)[0]
+                
+                trim_index = common_utilities.nearest_point_in_list(surface_snap, vector_path)    
+                p3d = p3d[trim_index+1:]
+                p3d.insert(0,(surface_snap, p3d[0][1]))
+                
             stroke = p3d
             self.sketch = []
             dprint('')
             dprint('')
             dprint('inserting stroke')
             self.polystrips.insert_gedge_from_stroke(stroke, False)
+            
+            #test test existing edge snapping
+            if self.hover_ed and len(self.polystrips.gedges) >= n+1:
+                v0 = self.dest_obj.matrix_world * self.hover_ed.verts[0].co
+                v1 = self.dest_obj.matrix_world * self.hover_ed.verts[1].co
+                
+                #get GV0 of the first Gedge created after stroke
+                #assumes gedges are created from tip to tail, even with intersections
+                GV0 = self.polystrips.gedges[n].gvert0
+                GV0.extension_edge = self.hover_ed.index
+                GV0.extension_edge_v0 = v0
+                GV0.extension_edge_v1 = v1
+                GV0.update()
+                
+                if len(self.polystrips.gedges[n].cache_igverts):
+                    gv0 = self.polystrips.gedges[n].cache_igverts[0]
+                    gv0.extension_edge = self.hover_ed.index
+                    gv0.extension_edge_v0 = v0
+                    gv0.extension_edge_v1 = v1
+                    gv0.update()
+                
             self.polystrips.remove_unconnected_gverts()
             self.polystrips.update_visibility(eventd['r3d'])
             return 'main'
@@ -1640,7 +1713,7 @@ class PolystripsUI:
             n0  = Vector((0,0,1))
             tx0 = Vector((1,0,0))
             ty0 = Vector((0,1,0))
-            return GVert(self.obj,p0,r0,n0,tx0,ty0)
+            return GVert(self.obj, self.dest_obj, p0,r0,n0,tx0,ty0)
         
         for spline in data.splines:
             pregv = None
@@ -1650,7 +1723,7 @@ class PolystripsUI:
                 gv2 = self.create_gvert(mx, bp1.handle_left, 0.2)
                 gv3 = self.create_gvert(mx, bp1.co, 0.2)
                 
-                ge0 = GEdge(self.obj, gv0, gv1, gv2, gv3)
+                ge0 = GEdge(self.obj, self.dest_obj, gv0, gv1, gv2, gv3)
                 ge0.recalc_igverts_approx()
                 ge0.snap_igverts_to_object()
                 
