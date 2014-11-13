@@ -33,7 +33,8 @@ bl_info = {
     }
 
 # Add the current __file__ path to the search path
-import sys, os
+import sys
+import os
 sys.path.append(os.path.dirname(__file__))
 
 import math
@@ -42,7 +43,10 @@ import random
 import time
 from math import sqrt
 
-import bpy, bmesh, blf, bgl
+import bpy
+import bmesh
+import blf
+import bgl
 from bpy.props import EnumProperty, StringProperty, BoolProperty, IntProperty, FloatVectorProperty, FloatProperty
 from bpy.types import Operator, AddonPreferences
 from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vector_3d, region_2d_to_location_3d
@@ -63,23 +67,23 @@ from polystrips_draw import *
 # Used to store keymaps for addon
 polystrips_keymaps = []
 
-#used to store undo snapshots
+# Used to store undo snapshots
 polystrips_undo_cache = []
+
 
 class PolystripsToolsAddonPreferences(AddonPreferences):
     bl_idname = __name__
-    
+
     def update_theme(self, context):
         print('theme updated to ' + str(theme))
-        
-    
+
     debug = IntProperty(
-            name="Debug Level",
-            default=1,
-            min = 0,
-            max = 4,
-            )
-    
+        name="Debug Level",
+        default=1,
+        min=0,
+        max=4,
+        )
+
     theme = EnumProperty(
         items=[
             ('blue', 'Blue', 'Blue color scheme'),
@@ -89,7 +93,7 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         name='theme',
         default='blue'
         )
-    
+
     def rgba_to_float(r, g, b, a):
         return (r/255.0, g/255.0, b/255.0, a/255.0)
 
@@ -103,37 +107,36 @@ class PolystripsToolsAddonPreferences(AddonPreferences):
         'green': rgba_to_float(105, 246, 113, 255),
         'orange': rgba_to_float(254, 145, 0, 255)
     }
-    
+
     show_segment_count = BoolProperty(
         name='Show Selected Segment Count',
         description='Show segment count on selection',
         default=True
         )
-    
+
     quad_prev_radius = IntProperty(
         name="Pixel Brush Radius",
-        description = "Pixel brush size",
+        description="Pixel brush size",
         default=15,
         )
-    
+
     undo_depth = IntProperty(
         name="Undo Depth",
-        description = "Max number of undo steps",
+        description="Max number of undo steps",
         default=15,
         )
-    
+
     def draw(self, context):
         layout = self.layout
-        
+
         row = layout.row(align=True)
         row.prop(self, "theme", "Theme")
-        
+
         row = layout.row(align=True)
         row.prop(self, "show_segment_count")
-        
+
         row = layout.row(align=True)
         row.prop(self, "debug")
-
 
 
 class CGCOOKIE_OT_retopo_polystrips_panel(bpy.types.Panel):
@@ -142,13 +145,13 @@ class CGCOOKIE_OT_retopo_polystrips_panel(bpy.types.Panel):
     bl_label = "Polystrips"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
-    
+
     @classmethod
     def poll(cls, context):
         mode = bpy.context.mode
         obj = context.active_object
         return (obj and obj.type == 'MESH' and mode in ('OBJECT', 'EDIT_MESH'))
-    
+
     def draw(self, context):
         layout = self.layout
 
@@ -159,16 +162,15 @@ class CGCOOKIE_OT_retopo_polystrips_panel(bpy.types.Panel):
         col.operator("cgcookie.polystrips", icon="IPO_BEZIER")
 
 
-
 class CGCOOKIE_OT_polystrips(bpy.types.Operator):
     bl_idname = "cgcookie.polystrips"
-    bl_label  = "Polystrips"
-    
+    bl_label = "Polystrips"
+
     @classmethod
-    def poll(cls,context):
-        if context.mode not in {'EDIT_MESH','OBJECT'}:
+    def poll(cls, context):
+        if context.mode not in {'EDIT_MESH', 'OBJECT'}:
             return False
-        
+
         if context.active_object:
             if context.mode == 'EDIT_MESH':
                 if len(context.selected_objects) > 1:
@@ -179,32 +181,31 @@ class CGCOOKIE_OT_polystrips(bpy.types.Operator):
                 return context.object.type == 'MESH'
         else:
             return False
-    
+
     def draw_callback(self, context):
         return self.ui.draw_callback(context)
-    
+
     def modal(self, context, event):
         ret = self.ui.modal(context, event)
         if 'FINISHED' in ret or 'CANCELLED' in ret:
             self.ui.cleanup(context)
             common_utilities.callback_cleanup(self, context)
         return ret
-    
+
     def invoke(self, context, event):
         self.ui = PolystripsUI(context, event)
-        
-        # switch to modal
+
+        # Switch to modal
         self._handle = bpy.types.SpaceView3D.draw_handler_add(self.draw_callback, (context, ), 'WINDOW', 'POST_PIXEL')
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
-
 
 
 def register():
     bpy.utils.register_class(CGCOOKIE_OT_polystrips)
     bpy.utils.register_class(CGCOOKIE_OT_retopo_polystrips_panel)
     bpy.utils.register_class(PolystripsToolsAddonPreferences)
-    
+
 
 def unregister():
     bpy.utils.unregister_class(PolystripsToolsAddonPreferences)
@@ -215,30 +216,30 @@ def unregister():
 class PolystripsUI:
     def __init__(self, context, event):
         settings = common_utilities.get_settings()
-        
+
         self.mode = 'main'
-        
-        self.mode_pos      = (0,0)
-        self.cur_pos       = (0,0)
-        self.mode_radius   = 0
-        self.action_center = (0,0)
+
+        self.mode_pos = (0, 0)
+        self.cur_pos = (0, 0)
+        self.mode_radius = 0
+        self.action_center = (0, 0)
         self.action_radius = 0
         self.is_navigating = False
-        self.sketch_curpos = (0,0)
+        self.sketch_curpos = (0, 0)
         self.sketch_pressure = 1
         self.sketch = []
-        
+
         self.post_update = True
-        
+
         self.footer = ''
         self.footer_last = ''
-        
+
         self.last_matrix = None
-        
+
         self._timer = context.window_manager.event_timer_add(0.1, context.window)
-        
+
         self.stroke_smoothing = 0.75          # 0: no smoothing. 1: no change
-        
+
         if context.mode == 'OBJECT':
 
             self.obj_orig = context.object
@@ -250,73 +251,73 @@ class PolystripsUI:
             self.obj.hide = True
             self.obj.matrix_world = self.obj_orig.matrix_world
             self.me.update()
-            
-            #HACK
-            bpy.ops.object.mode_set(mode = 'EDIT')
-            bpy.ops.object.mode_set(mode = 'OBJECT')
-            
+
+            # HACK
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.object.mode_set(mode='OBJECT')
+
             self.bme = bmesh.new()
             self.bme.from_mesh(self.me)
-            
+
             self.to_obj = None
             self.to_bme = None
             self.snap_eds = []
             self.snap_eds_vis = []
             self.hover_ed = None
-            
+
         if context.mode == 'EDIT_MESH':
             self.obj_orig = [ob for ob in context.selected_objects if ob != context.object][0]
             self.me = self.obj_orig.to_mesh(scene=context.scene, apply_modifiers=True, settings='PREVIEW')
             self.me.update()
             self.bme = bmesh.new()
             self.bme.from_mesh(self.me)
-            
+
             self.obj = bpy.data.objects.new('PolystripsTmp', self.me)
             bpy.context.scene.objects.link(self.obj)
             self.obj.hide = True
             self.obj.matrix_world = self.obj_orig.matrix_world
             self.me.update()
-            
-            bpy.ops.object.mode_set(mode = 'OBJECT')
-            bpy.ops.object.mode_set(mode = 'EDIT')
-            
+
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.mode_set(mode='EDIT')
+
             self.to_obj = context.object
             self.to_bme = bmesh.from_edit_mesh(context.object.data)
             self.snap_eds = [ed for ed in self.to_bme.edges if not ed.is_manifold]
-            region,r3d = context.region,context.space_data.region_3d
+            region, r3d = context.region, context.space_data.region_3d
             mx = self.to_obj.matrix_world
             rv3d = context.space_data.region_3d
             self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, rv3d) for ed in self.snap_eds]
             self.hover_ed = None
-            
-        self.scale = self.obj.scale[0]    
-        self.length_scale = get_object_length_scale(self.obj)    
-        #world stroke radius
+
+        self.scale = self.obj.scale[0]
+        self.length_scale = get_object_length_scale(self.obj)
+        # World stroke radius
         self.stroke_radius = 0.01 * self.length_scale
         self.stroke_radius_pressure = 0.01 * self.length_scale
-        #screen_stroke_radius
-        self.screen_stroke_radius = 20 #TODO, hood to settings
-        
-        self.sketch_brush = SketchBrush(context, 
-                                        settings, 
-                                        event.mouse_region_x, event.mouse_region_y, 
-                                        15, #settings.quad_prev_radius, 
+        # Screen_stroke_radius
+        self.screen_stroke_radius = 20  # TODO, hood to settings
+
+        self.sketch_brush = SketchBrush(context,
+                                        settings,
+                                        event.mouse_region_x, event.mouse_region_y,
+                                        15,  # settings.quad_prev_radius,
                                         self.obj)
-        
+
         self.sel_gedge = None                           # selected gedge
         self.sel_gvert = None                           # selected gvert
         self.act_gvert = None                           # active gvert (operated upon)
-        
+
         self.polystrips = PolyStrips(context, self.obj)
-        
-        polystrips_undo_cache = []  #clear the cache in case any is left over
+
+        polystrips_undo_cache = []  # Clear the cache in case any is left over
         if self.obj.grease_pencil:
             self.create_polystrips_from_greasepencil()
         elif 'BezierCurve' in bpy.data.objects:
             self.create_polystrips_from_bezier(bpy.data.objects['BezierCurve'])
-        
+
         context.area.header_text_set('PolyStrips')
-    
+
     ###############################
     def create_undo_snapshot(self, action):
         '''
@@ -324,87 +325,85 @@ class PolystripsUI:
         and if sel_gedges and verts get copied as references
         or also duplicated, making them no longer valid.
         '''
+
         settings = common_utilities.get_settings()
-        repeated_actions = {'count','zip count'}
-        
+        repeated_actions = {'count', 'zip count'}
+
         if action in repeated_actions and len(polystrips_undo_cache):
             if action == polystrips_undo_cache[-1][1]:
                 print('repeatable...dont take snapshot')
                 return
-        
+
         p_data = copy.deepcopy(self.polystrips)
-        
+
         if self.sel_gedge:
             sel_gedge = self.polystrips.gedges.index(self.sel_gedge)
         else:
             sel_gedge = None
-            
+
         if self.sel_gvert:
             sel_gvert = self.polystrips.gverts.index(self.sel_gvert)
         else:
             sel_gvert = None
-            
+
         if self.act_gvert:
             act_gvert = self.polystrips.gverts.index(self.sel_gvert)
         else:
             act_gvert = None
-            
+
         polystrips_undo_cache.append(([p_data, sel_gvert, sel_gedge, act_gvert], action))
-            
+
         if len(polystrips_undo_cache) > settings.undo_depth:
             polystrips_undo_cache.pop(0)
-            
-            
+
     def undo_action(self):
         '''
         '''
         if len(polystrips_undo_cache) > 0:
             data, action = polystrips_undo_cache.pop()
-            
+
             self.polystrips = data[0]
-            
+
             if data[1]:
                 self.sel_gvert = self.polystrips.gverts[data[1]]
             else:
                 self.sel_gvert = None
-                
+
             if data[2]:
                 self.sel_gedge = self.polystrips.gedges[data[2]]
             else:
                 self.sel_gedge = None
-                
+
             if data[3]:
                 self.act_gvert = self.polystrips.gverts[data[3]]
             else:
                 self.act_gvert = None
-                
 
     def cleanup(self, context):
         '''
         remove temporary object
         '''
         dprint('cleaning up!')
-        
-        tmpobj = self.obj #not always, sometimes if duplicate remains...will be .001
+
+        tmpobj = self.obj  # Not always, sometimes if duplicate remains...will be .001
         meobj  = tmpobj.data
-        
-        # delete object
+
+        # Delete object
         context.scene.objects.unlink(tmpobj)
         tmpobj.user_clear()
         if tmpobj.name in bpy.data.objects:
             bpy.data.objects.remove(tmpobj)
-        
+
         bpy.context.scene.update()
         bpy.data.meshes.remove(meobj)
-        
-    
+
     ################################
-    # draw functions
-    
+    # Draw functions
+
     def draw_callback(self, context):
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
-        
+
         new_matrix = [v for l in r3d.view_matrix for v in l]
         if self.post_update or self.last_matrix != new_matrix:
             for gv in self.polystrips.gverts:
@@ -417,59 +416,57 @@ class PolystripsUI:
             if self.sel_gvert:
                 for gv in self.sel_gvert.get_inner_gverts():
                     gv.update_visibility(r3d)
-            
+
             if len(self.snap_eds):
                 mx = self.obj.matrix_world
                 self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
-            
+
             self.post_update = False
             self.last_matrix = new_matrix
-            
-            
+
+
         if settings.debug < 3:
             self.draw_callback_themed(context)
         else:
             self.draw_callback_debug(context)
-    
-        
-            
+
     def draw_callback_themed(self, context):
         settings = common_utilities.get_settings()
         region,r3d = context.region,context.space_data.region_3d
-        
-        # theme_number = int(settings.theme)
-        
 
-        color_inactive  = PolystripsToolsAddonPreferences.theme_colors_mesh[settings.theme]
+        # theme_number = int(settings.theme)
+
+
+        color_inactive = PolystripsToolsAddonPreferences.theme_colors_mesh[settings.theme]
         color_selection = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]
-        color_active    = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme]     # not used at the moment
-        
+        color_active = PolystripsToolsAddonPreferences.theme_colors_selection[settings.theme] # Not used at the moment
+
         bgl.glEnable(bgl.GL_POINT_SMOOTH)
-        
+
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if gedge == self.sel_gedge:
                 color_border = (color_selection[0], color_selection[1], color_selection[2], 1.00)
-                color_fill   = (color_selection[0], color_selection[1], color_selection[2], 0.20)
+                color_fill = (color_selection[0], color_selection[1], color_selection[2], 0.20)
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
-                color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.20)
-            
+                color_fill = (color_inactive[0], color_inactive[1], color_inactive[2], 0.20)
+
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_quads_from_3dpoints(context, [c0,c1,c2,c3], color_fill)
                 common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], color_border, 1, "GL_LINE_STIPPLE")
-            
+
             if settings.debug >= 2:
                 # draw bezier
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
                 p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
                 common_drawing.draw_polyline_from_3dpoints(context, p3d, (1,1,1,0.5),1, "GL_LINE_STIPPLE")
-        
+
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
             p0,p1,p2,p3 = gv.get_corners()
-            
+
             if gv.is_unconnected(): continue
-            
+
             is_selected = False
             is_selected |= gv == self.sel_gvert
             is_selected |= self.sel_gedge!=None and (self.sel_gedge.gvert0 == gv or self.sel_gedge.gvert1 == gv)
@@ -480,15 +477,15 @@ class PolystripsUI:
             else:
                 color_border = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
                 color_fill   = (color_inactive[0], color_inactive[1], color_inactive[2], 0.20)
-            
+
             p3d = [p0,p1,p2,p3,p0]
             common_drawing.draw_quads_from_3dpoints(context, [p0,p1,p2,p3], color_fill)
             common_drawing.draw_polyline_from_3dpoints(context, p3d, color_border, 1, "GL_LINE_STIPPLE")
-        
+
         p3d = [gvert.position for gvert in self.polystrips.gverts if not gvert.is_unconnected() and gvert.is_visible()]
         color = (color_inactive[0], color_inactive[1], color_inactive[2], 1.00)
         common_drawing.draw_3d_points(context, p3d, color, 4)
-        
+
         if self.sel_gvert:
             color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             gv = self.sel_gvert
@@ -502,7 +499,7 @@ class PolystripsUI:
                 common_drawing.draw_3d_points(context, [p0] + p3d, color, 8)
                 for p1 in p3d:
                     common_drawing.draw_polyline_from_3dpoints(context, [p0,p1], color, 2, "GL_LINE_SMOOTH")
-        
+
         if self.sel_gedge:
             color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             ge = self.sel_gedge
@@ -514,39 +511,39 @@ class PolystripsUI:
                 common_drawing.draw_3d_points(context, p3d, color, 8)
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[0], p3d[1]], color, 2, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p3d[2], p3d[3]], color, 2, "GL_LINE_SMOOTH")
-            
+
             if settings.show_segment_count:
                 draw_gedge_info(self.sel_gedge, context)
-        
+
         if self.act_gvert:
             color = (color_active[0], color_active[1], color_active[2], 1.00)
             gv = self.act_gvert
             p0 = gv.position
             common_drawing.draw_3d_points(context, [p0], color, 8)
-        
+
         if self.mode == 'sketch':
-            # draw smoothing line (end of sketch to current mouse position)
+            # Draw smoothing line (end of sketch to current mouse position)
             common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], color_active, 1, "GL_LINE_SMOOTH")
-            
-            # draw sketching stroke
+
+            # Draw sketching stroke
             common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], color_selection, 2, "GL_LINE_STIPPLE")
-            
-            # report pressure reading
+
+            # Report pressure reading
             info = str(round(self.sketch_pressure,3))
             txt_width, txt_height = blf.dimensions(0, info)
             d = self.sketch_brush.pxl_rad
             blf.position(0, self.sketch_curpos[0] - txt_width/2, self.sketch_curpos[1] + d + txt_height, 0)
             blf.draw(0, info)
-        
+
         if self.mode in {'scale tool','rotate tool'}:
-            # draw a scale/rotate line from tool origin to current mouse position
-            common_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
-        
+            # Draw a scale/rotate line from tool origin to current mouse position
+            common_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0, 0, 0, 0.5), 1, "GL_LINE_STIPPLE")
+
         bgl.glLineWidth(1)
-        
+
         if self.mode == 'brush scale tool':
             # scaling brush size
-            self.sketch_brush.draw(context, color=(1,1,1,.5), linewidth=1, color_size=(1,1,1,1))
+            self.sketch_brush.draw(context, color=(1, 1, 1, .5), linewidth=1, color_size=(1, 1, 1, 1))
         elif self.mode not in {'grab tool','scale tool','rotate tool'} and not self.is_navigating:
             # draw the brush oriented to surface
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
@@ -566,17 +563,17 @@ class PolystripsUI:
                     hit_p3d = mx * hit_p3d
                     hit_norm = mxnorm * hit_norm
                     common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
-        
+
         if self.hover_ed and False:
             color = (color_selection[0], color_selection[1], color_selection[2], 1.00)
             common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color)
-    
-            
+
+
     def draw_callback_debug(self, context):
         settings = common_utilities.get_settings()
         region = context.region
         r3d = context.space_data.region_3d
-        
+
         draw_original_strokes   = False
         draw_gedge_directions   = True
         draw_gvert_orientations = False
@@ -585,15 +582,15 @@ class PolystripsUI:
         draw_gedge_bezier       = False
         draw_gedge_index        = False
         draw_gedge_igverts      = False
-        
+
         cols = [(1,.5,.5,.8),(.5,1,.5,.8),(.5,.5,1,.8),(1,1,.5,.8)]
-        
+
         color_selected          = (.5,1,.5,.8)
-        
+
         color_gedge             = (1,.5,.5,.8)
         color_gedge_nocuts      = (.5,.2,.2,.8)
         color_gedge_zipped      = (.5,.7,.7,.8)
-        
+
         color_gvert_unconnected = (.2,.2,.2,.8)
         color_gvert_endpoint    = (.2,.2,.5,.8)
         color_gvert_endtoend    = (.5,.5,1,.8)
@@ -601,21 +598,20 @@ class PolystripsUI:
         color_gvert_tjunction   = (1,1,.5,.8)
         color_gvert_cross       = (1,1,1,.8)
         color_gvert_midpoints   = (.7,1,.7,.8)
-        
+
         t = time.time()
         tf = t - int(t)
         tb = tf*2 if tf < 0.5 else 2-(tf*2)
         tb1 = 1-tb
         sel_fn = lambda c: tuple(cv*tb+cs*tb1 for cv,cs in zip(c,color_selected))
-        
+
         if draw_original_strokes:
             for stroke in self.strokes_original:
                 #p3d = [pt for pt,pr in stroke]
                 #common_drawing.draw_polyline_from_3dpoints(context, p3d, (.7,.7,.7,.8), 3, "GL_LINE_SMOOTH")
                 common_drawing.draw_circle(context, stroke[0][0], Vector((0,0,1)),0.003,(.2,.2,.2,.8))
                 common_drawing.draw_circle(context, stroke[-1][0], Vector((0,1,0)),0.003,(.5,.5,.5,.8))
-        
-        
+
         for i_ge,gedge in enumerate(self.polystrips.gedges):
             if draw_gedge_directions:
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
@@ -628,57 +624,57 @@ class PolystripsUI:
                 rl = rs * 0.75
                 p3d = [pm-px*rs,pm+px*rs,pm+px*(rs-rl)+py*rl,pm+px*rs,pm+px*(rs-rl)-py*rl]
                 common_drawing.draw_polyline_from_3dpoints(context, p3d, (0.8,0.8,0.8,0.8),1, "GL_LINE_SMOOTH")
-            
+
             if draw_gedge_bezier:
                 p0,p1,p2,p3 = gedge.gvert0.snap_pos, gedge.gvert1.snap_pos, gedge.gvert2.snap_pos, gedge.gvert3.snap_pos
                 p3d = [cubic_bezier_blend_t(p0,p1,p2,p3,t/16.0) for t in range(17)]
                 common_drawing.draw_polyline_from_3dpoints(context, p3d, (0.5,0.5,0.5,0.8),1, "GL_LINE_SMOOTH")
-            
+
             col = color_gedge if len(gedge.cache_igverts) else color_gedge_nocuts
             if gedge.zip_to_gedge: col = color_gedge_zipped
             if gedge == self.sel_gedge: col = sel_fn(col)
             w = 2 if len(gedge.cache_igverts) else 5
             for c0,c1,c2,c3 in gedge.iter_segments(only_visible=True):
                 common_drawing.draw_polyline_from_3dpoints(context, [c0,c1,c2,c3,c0], col, w, "GL_LINE_SMOOTH")
-            
+
             if draw_gedge_index:
                 draw_gedge_text(gedge, context, str(i_ge))
-            
+
             if draw_gedge_igverts:
                 rm = (gedge.gvert0.radius + gedge.gvert3.radius)*0.1
                 for igv in gedge.cache_igverts:
                     common_drawing.common_drawing.draw_circle(context, igv.position, igv.normal, rm, (1,1,1,.3))
-        
+
         for i_gv,gv in enumerate(self.polystrips.gverts):
             if not gv.is_visible(): continue
             p0,p1,p2,p3 = gv.get_corners()
-            
+
             if not draw_unconnected_gverts and gv.is_unconnected() and gv != self.sel_gvert: continue
-            
+
             col = color_gvert_unconnected
             if gv.is_endpoint(): col = color_gvert_endpoint
             elif gv.is_endtoend(): col = color_gvert_endtoend
             elif gv.is_ljunction(): col = color_gvert_ljunction
             elif gv.is_tjunction(): col = color_gvert_tjunction
             elif gv.is_cross(): col = color_gvert_cross
-            
+
             if gv == self.sel_gvert: col = sel_fn(col)
-            
+
             p3d = [p0,p1,p2,p3,p0]
             common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
-            
+
             if draw_gvert_orientations:
                 p,x,y = gv.snap_pos,gv.snap_tanx,gv.snap_tany
                 common_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.005], (1,0,0,1), 1, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.005], (0,1,0,1), 1, "GL_LINE_SMOOTH")
-        
+
         if draw_gvert_unsnapped:
             for gv in self.polystrips.gverts:
                 p,x,y,n = gv.position,gv.snap_tanx,gv.snap_tany,gv.snap_norm
                 common_drawing.draw_polyline_from_3dpoints(context, [p,p+x*0.01], (1,0,0,1), 1, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p,p+y*0.01], (0,1,0,1), 1, "GL_LINE_SMOOTH")
                 common_drawing.draw_polyline_from_3dpoints(context, [p,p+n*0.01], (0,0,1,1), 1, "GL_LINE_SMOOTH")
-        
+
         if self.sel_gedge:
             if not self.sel_gedge.zip_to_gedge:
                 col = color_gvert_midpoints
@@ -688,7 +684,7 @@ class PolystripsUI:
                     p3d = [p0,p1,p2,p3,p0]
                     common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
             draw_gedge_info(self.sel_gedge, context)
-        
+
         if self.sel_gvert:
             col = color_gvert_midpoints
             for ge in self.sel_gvert.get_gedges_notnone():
@@ -698,24 +694,23 @@ class PolystripsUI:
                 p0,p1,p2,p3 = gv.get_corners()
                 p3d = [p0,p1,p2,p3,p0]
                 common_drawing.draw_polyline_from_3dpoints(context, p3d, col, 2, "GL_LINE_SMOOTH")
-        
+
         if self.mode == 'sketch':
             common_drawing.draw_polyline_from_points(context, [self.sketch_curpos, self.sketch[-1][0]], (0.5,0.5,0.2,0.8), 1, "GL_LINE_SMOOTH")
             common_drawing.draw_polyline_from_points(context, [co[0] for co in self.sketch], (1,1,.5,.8), 2, "GL_LINE_SMOOTH")
-            
+
             info = str(round(self.sketch_pressure,3))
             ''' draw text '''
             txt_width, txt_height = blf.dimensions(0, info)
             d = self.sketch_brush.pxl_rad
             blf.position(0, self.sketch_curpos[0] - txt_width/2, self.sketch_curpos[1] + d + txt_height, 0)
             blf.draw(0, info)
-        
-            
+
         if self.mode in {'scale tool','rotate tool'}:
             common_drawing.draw_polyline_from_points(context, [self.action_center, self.mode_pos], (0,0,0,0.5), 1, "GL_LINE_STIPPLE")
-        
+
         bgl.glLineWidth(1)
-        
+
         if self.mode not in {'grab tool','scale tool','rotate tool','brush scale tool'}:
             ray,hit = common_utilities.ray_cast_region2d(region, r3d, self.cur_pos, self.obj, settings)
             hit_p3d,hit_norm,hit_idx = hit
@@ -723,89 +718,89 @@ class PolystripsUI:
                 mx = self.obj.matrix_world
                 hit_p3d = mx * hit_p3d
                 common_drawing.draw_circle(context, hit_p3d, hit_norm.normalized(), self.stroke_radius_pressure, (1,1,1,.5))
-        
+
         if not self.hover_ed:
             self.sketch_brush.draw(context)
         else:
             common_drawing.draw_bmedge(context, self.hover_ed, self.to_obj.matrix_world, 2, color_selected)
-    
-    
+
     ############################
     # function to convert polystrips => mesh
-    
+
     def create_mesh(self, context):
         verts,quads = self.polystrips.create_mesh()
-        
+
         if self.to_bme and self.to_obj:  #EDIT MDOE on Existing Mesh
             bm = self.to_bme
             mx = self.to_obj.matrix_world
             imx = mx.inverted()
-            
+
             mx2 = self.obj.matrix_world
             imx2 = mx2.inverted()
-            
+
         else:
             bm = bmesh.new()
             mx2 = Matrix.Identity(4)
             imx = Matrix.Identity(4)
-            
+
             nm_polystrips = self.obj.name + "_polystrips"
-        
+
             dest_me  = bpy.data.meshes.new(nm_polystrips)
             dest_obj = bpy.data.objects.new(nm_polystrips, dest_me)
-        
+
             dest_obj.matrix_world = self.obj.matrix_world
             dest_obj.update_tag()
             dest_obj.show_all_edges = True
             dest_obj.show_wire      = True
             dest_obj.show_x_ray     = True
-            
+
             context.scene.objects.link(dest_obj)
             dest_obj.select = True
             context.scene.objects.active = dest_obj
-            
-        
+
         bmverts = [bm.verts.new(imx * mx2 * v) for v in verts]
         bm.verts.index_update()
-        for q in quads: bm.faces.new([bmverts[i] for i in q])
-        
+        for q in quads: 
+            bm.faces.new([bmverts[i] for i in q])
+
         bm.faces.index_update()
-        
+
         if self.to_bme and self.to_obj:
             bmesh.update_edit_mesh(self.to_obj.data, tessface=False, destructive=True)
             bm.free()
         else: 
             bm.to_mesh(dest_me)
             bm.free()
-        
+
     ###########################
     # hover functions
-    
+
     def hover_geom(self,eventd):
-        if not len(self.snap_eds): return 
+        if not len(self.snap_eds): 
+            return 
         context = eventd['context']
         region,r3d = context.region,context.space_data.region_3d
         new_matrix = [v for l in r3d.view_matrix for v in l]
         x, y = eventd['mouse']
         mouse_loc = Vector((x,y))
         mx = self.to_obj.matrix_world
-        
+
         if self.post_update or self.last_matrix != new_matrix:
-            #update all the visibility stuff
+            # Update all the visibility stuff
             self.snap_eds_vis = [False not in common_utilities.ray_cast_visible([mx * ed.verts[0].co, mx * ed.verts[1].co], self.obj, r3d) for ed in self.snap_eds]
-           
-        #sticky highlight...check the hovered edge first
+
+        # Sticky highlight...check the hovered edge first
         if self.hover_ed:
             a = location_3d_to_region_2d(region, r3d, mx * self.hover_ed.verts[0].co)
             b = location_3d_to_region_2d(region, r3d, mx * self.hover_ed.verts[1].co)
-            
+
             if a and b:
                 intersect = intersect_point_line(mouse_loc, a, b)
                 dist = (intersect[0] - mouse_loc).length_squared
                 bound = intersect[1]
                 if (dist < 100) and (bound < 1) and (bound > 0):
                     return
-    
+
         self.hover_ed = None
         for i,ed in enumerate(self.snap_eds):
             if self.snap_eds_vis[i]:
@@ -813,17 +808,16 @@ class PolystripsUI:
                 b = location_3d_to_region_2d(region, r3d, mx * ed.verts[1].co)
                 if a and b:
                     intersect = intersect_point_line(mouse_loc, a, b)
-    
+
                     dist = (intersect[0] - mouse_loc).length_squared
                     bound = intersect[1]
                     if (dist < 100) and (bound < 1) and (bound > 0):
                         self.hover_ed = ed
                         break
-                    
-                        
+
     ###########################
     # tool functions
-    
+
     def ready_tool(self, eventd, tool_fn):
         rgn   = eventd['context'].region
         r3d   = eventd['context'].space_data.region_3d
@@ -837,25 +831,25 @@ class PolystripsUI:
         else:
             cx,cy = mx-100,my
         rad   = math.sqrt((mx-cx)**2 + (my-cy)**2)
-        
+
         self.action_center = (cx,cy)
         self.mode_start    = (mx,my)
         self.action_radius = rad
         self.mode_radius   = rad
         
         self.prev_pos      = (mx,my)
-        
+
         # spc = bpy.data.window_managers['WinMan'].windows[0].screen.areas[4].spaces[0]
         # r3d = spc.region_3d
         vrot = r3d.view_rotation
         self.tool_x = (vrot * Vector((1,0,0))).normalized()
         self.tool_y = (vrot * Vector((0,1,0))).normalized()
-        
+
         self.tool_rot = 0.0
-        
+
         self.tool_fn = tool_fn
         self.tool_fn('init', eventd)
-    
+
     def scale_tool_gvert(self, command, eventd):
         if command == 'init':
             self.footer = 'Scaling GVerts'
@@ -881,7 +875,7 @@ class PolystripsUI:
                 gv.update()
             sgv.update()
             self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
-    
+
     def scale_tool_gvert_radius(self, command, eventd):
         if command == 'init':
             self.footer = 'Scaling GVert radius'
@@ -897,7 +891,7 @@ class PolystripsUI:
             self.sel_gvert.radius *= m
             self.sel_gvert.update()
             self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
-    
+
     def scale_tool_stroke_radius(self, command, eventd):
         if command == 'init':
             self.footer = 'Scaling Stroke radius'
@@ -909,14 +903,15 @@ class PolystripsUI:
         else:
             m = command
             self.stroke_radius *= m
-    
+
     def grab_tool_gvert_list(self, command, eventd, lgv):
         '''
         translates list of gverts
         note: translation is relative to first gvert
         '''
+
         def l3dr2d(p): return location_3d_to_region_2d(eventd['region'], eventd['r3d'], p)
-        
+
         if command == 'init':
             self.footer = 'Translating GVert position(s)'
             s2d = l3dr2d(lgv[0].position)
@@ -940,7 +935,7 @@ class PolystripsUI:
             for gv,_,_ in self.tool_data:
                 gv.update()
                 gv.update_visibility(eventd['r3d'], update_gedges=True)
-        
+
     def grab_tool_gvert(self, command, eventd):
         '''
         translates selected gvert
@@ -950,7 +945,7 @@ class PolystripsUI:
         else:
             lgv = None
         self.grab_tool_gvert_list(command, eventd, lgv)
-    
+
     def grab_tool_gvert_neighbors(self, command, eventd):
         '''
         translates selected gvert and its neighbors
@@ -962,7 +957,7 @@ class PolystripsUI:
         else:
             lgv = None
         self.grab_tool_gvert_list(command, eventd, lgv)
-    
+
     def grab_tool_gedge(self, command, eventd):
         if command == 'init':
             sge = self.sel_gedge
@@ -971,7 +966,7 @@ class PolystripsUI:
         else:
             lgv = None
         self.grab_tool_gvert_list(command, eventd, lgv)
-    
+
     def rotate_tool_gvert_neighbors(self, command, eventd):
         if command == 'init':
             self.footer = 'Rotating GVerts'
@@ -989,7 +984,7 @@ class PolystripsUI:
             for gv,up in self.tool_data:
                 gv.position = p+q*(up-p)
                 gv.update()
-    
+
     def scale_brush_pixel_radius(self,command, eventd):
         if command == 'init':
             self.footer = 'Scale Brush Pixel Size'
@@ -1006,11 +1001,11 @@ class PolystripsUI:
         else:
             x,y = command
             self.sketch_brush.brush_pix_size_interact(x, y, precise = eventd['shift'])
-    
-    
+
+
     ##############################
     # modal state functions
-    
+
     def modal_nav(self, eventd):
         events_numpad = {
             'NUMPAD_1',       'NUMPAD_2',       'NUMPAD_3',
@@ -1025,7 +1020,7 @@ class PolystripsUI:
             'NUMPAD_PLUS', 'NUMPAD_MINUS', # CTRL+NUMPAD_PLUS and CTRL+NUMPAD_MINUS are used elsewhere
             'NUMPAD_PERIOD',
         }
-        
+
         handle_nav = False
         handle_nav |= eventd['type'] == 'MIDDLEMOUSE'
         handle_nav |= eventd['type'] == 'MOUSEMOVE' and self.is_navigating
@@ -1033,11 +1028,11 @@ class PolystripsUI:
         handle_nav |= eventd['type'].startswith('TRACKPAD')
         handle_nav |= eventd['ftype'] in events_numpad
         handle_nav |= eventd['ftype'] in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}
-        
+
         if handle_nav:
             self.post_update = True
             self.is_navigating = True
-            
+
             # x,y = eventd['mouse']
             # self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
             # self.sketch_brush.make_circles()
@@ -1048,62 +1043,60 @@ class PolystripsUI:
             #     self.stroke_radius_pressure = self.sketch_brush.world_width
                 
             return 'nav' if eventd['value']=='PRESS' else 'main'
-        
+
         self.is_navigating = False
         return ''
-    
+
     def modal_main(self, eventd):
         self.footer = 'LMB: draw, RMB: select, G: grab, R: rotate, S: scale, F: brush size, K: knife, M: merge, X: delete, CTRL+D: dissolve, CTRL+Wheel Up/Down: adjust segments, CTRL+C: change selected junction type'
-        
+
         #############################################
-        # general navigation
-        
+        # General navigation
+
         nmode = self.modal_nav(eventd)
         if nmode:
             return nmode
-        
+
         ########################################
         # accept / cancel
-        
+
         if eventd['press'] in {'RET', 'NUMPAD_ENTER'}:
             self.create_mesh(eventd['context'])
             eventd['context'].area.header_text_set()
             return 'finish'
-        
+
         if eventd['press'] in {'ESC'}:
             eventd['context'].area.header_text_set()
             return 'cancel'
-        
-        
+
         #####################################
-        # general
-        
+        # General
+
         if eventd['type'] == 'MOUSEMOVE':  #mouse movement/hovering
             #update brush and brush size
             x,y = eventd['mouse']
             self.sketch_brush.update_mouse_move_hover(eventd['context'], x,y)
             self.sketch_brush.make_circles()
             self.sketch_brush.get_brush_world_size(eventd['context'])
-            
+
             if self.sketch_brush.world_width:
                 self.stroke_radius = self.sketch_brush.world_width
                 self.stroke_radius_pressure = self.sketch_brush.world_width
-            
+
             self.hover_geom(eventd)
-        
-        
+
         if eventd['press'] == 'CTRL+Z':
             self.undo_action()
             return ''
-        
+
         if eventd['press'] == 'F':
             self.ready_tool(eventd, self.scale_brush_pixel_radius)
             return 'brush scale tool'
-        
+
         if eventd['press'] == 'Q':                                                  # profiler printout
             profiler.printout()
             return ''
-        
+
         if eventd['press'] == 'P':                                                  # grease pencil => strokes
             # TODO: only convert gpencil strokes that are visible and prevent duplicate conversion
             for gpl in self.obj.grease_pencil.layers: gpl.hide = True
@@ -1112,29 +1105,28 @@ class PolystripsUI:
             self.polystrips.remove_unconnected_gverts()
             self.polystrips.update_visibility(eventd['r3d'])
             return ''
-        
-        
-        if eventd['press'] in {'LEFTMOUSE','SHIFT+LEFTMOUSE'}:
+
+        if eventd['press'] in {'LEFTMOUSE', 'SHIFT+LEFTMOUSE'}:
             self.create_undo_snapshot('sketch')                   
             # start sketching
             self.footer = 'Sketching'
             x,y = eventd['mouse']
             p   = eventd['pressure']
             r   = eventd['mradius']
-            
+
             self.sketch_curpos = (x,y)
-            
+
             if eventd['shift'] and self.sel_gvert:
                 # continue sketching from selected gvert position
                 gvx,gvy = location_3d_to_region_2d(eventd['region'], eventd['r3d'], self.sel_gvert.position)
                 self.sketch = [((gvx,gvy),self.sel_gvert.radius), ((x,y),r)]
             else:
                 self.sketch = [((x,y),r)]
-            
+
             self.sel_gvert = None
             self.sel_gedge = None
             return 'sketch'
-        
+
         if eventd['press'] == 'RIGHTMOUSE':                                         # picking
             x,y = eventd['mouse']
             pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
@@ -1142,7 +1134,7 @@ class PolystripsUI:
                 self.sel_gvert,self.sel_gedge,self.act_gvert = None,None,None
                 return ''
             pt = pts[0]
-            
+
             if self.sel_gvert or self.sel_gedge:
                 # check if user is picking an inner control point
                 if self.sel_gedge and not self.sel_gedge.zip_to_gedge:
@@ -1153,29 +1145,29 @@ class PolystripsUI:
                     lcpts = [ge.get_inner_gvert_at(sgv) for ge in lge if ge and not ge.zip_to_gedge] + [sgv]
                 else:
                     lcpts = []
-                
+
                 for cpt in lcpts:
                     if not cpt.is_picked(pt): continue
                     self.sel_gvert = cpt
                     self.sel_gedge = None
                     return ''
-            
+
             for gv in self.polystrips.gverts:
                 if gv.is_unconnected(): continue
                 if not gv.is_picked(pt): continue
                 self.sel_gvert = gv
                 self.sel_gedge = None
                 return ''
-            
+
             for ge in self.polystrips.gedges:
                 if not ge.is_picked(pt): continue
                 self.sel_gvert = None
                 self.sel_gedge = ge
                 return ''
-            
+
             self.sel_gedge,self.sel_gvert = None,None
             return ''
-        
+
         if eventd['press'] == 'CTRL+LEFTMOUSE':                                     # delete/dissolve
             x,y = eventd['mouse']
             pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
@@ -1183,45 +1175,44 @@ class PolystripsUI:
                 self.sel_gvert,self.sel_gedge,self.act_gvert = None,None,None
                 return ''
             pt = pts[0]
-            
+
             for gv in self.polystrips.gverts:
                 if not gv.is_picked(pt): continue
                 if not (gv.is_endpoint() or gv.is_endtoend() or gv.is_ljunction()): continue
-                
+
                 if gv.is_endpoint():
                     self.polystrips.disconnect_gvert(gv)
                 else:
                     self.polystrips.dissolve_gvert(gv)
-                
+
                 self.polystrips.remove_unconnected_gverts()
                 self.polystrips.update_visibility(eventd['r3d'])
-                
+
                 self.sel_gvert = None
                 self.sel_gedge = None
                 return ''
-            
+
             for ge in self.polystrips.gedges:
                 if not ge.is_picked(pt): continue
-                
+
                 self.polystrips.disconnect_gedge(ge)
                 self.polystrips.remove_unconnected_gverts()
-                
+
                 self.sel_gvert = None
                 self.sel_gedge = None
                 return ''
-            
+
             self.sel_gedge,self.sel_gvert = None,None
             return ''
-        
+
         if eventd['press'] == 'CTRL+U':
             self.create_undo_snapshot('update')
             for gv in self.polystrips.gverts:
                 gv.update_gedges()
-        
-        
+
         ###################################
-        # selected gedge commands
-        
+        # Selected gedge commands
+
         if self.sel_gedge:
             if eventd['press'] == 'X':
                 self.create_undo_snapshot('delete')
@@ -1229,7 +1220,7 @@ class PolystripsUI:
                 self.sel_gedge = None
                 self.polystrips.remove_unconnected_gverts()
                 return ''
-            
+
             if eventd['press'] == 'K' and not self.sel_gedge.is_zippered() and not self.sel_gedge.has_zippered():
                 self.create_undo_snapshot('knife')
                 x,y = eventd['mouse']
@@ -1241,42 +1232,42 @@ class PolystripsUI:
                 _,_,gv = self.polystrips.split_gedge_at_t(self.sel_gedge, t)
                 self.sel_gedge = None
                 self.sel_gvert = gv
-            
+
             if eventd['press'] == 'U':
                 self.create_undo_snapshot('update')
                 self.sel_gedge.gvert0.update_gedges()
                 self.sel_gedge.gvert3.update_gedges()
                 return ''
-            
+
             if eventd['press']in {'OSKEY+WHEELUPMOUSE', 'CTRL+NUMPAD_PLUS'}:
                 self.create_undo_snapshot('count')
                 self.sel_gedge.n_quads += 1
                 self.sel_gedge.force_count = True
                 self.sel_gedge.update()
                 return ''
-            
+
             if eventd['press'] in {'OSKEY+WHEELDOWNMOUSE', 'CTRL+NUMPAD_MINUS'}:
-    
+
                 if self.sel_gedge.n_quads > 3:
                     self.create_undo_snapshot('count')
                     self.sel_gedge.n_quads -= 1
                     self.sel_gedge.force_count = True
                     self.sel_gedge.update()
                 return ''
-            
+
             if eventd['press'] == 'Z':
-                
+
                 if self.sel_gedge.zip_to_gedge:
                     self.create_undo_snapshot('unzip')
                     self.sel_gedge.unzip()
                     return ''
-                
+
                 lge = self.sel_gedge.gvert0.get_gedges_notnone() + self.sel_gedge.gvert3.get_gedges_notnone()
                 if any(ge.is_zippered() for ge in lge):
                     # prevent zippering a gedge with gvert that has a zippered gedge already
                     # TODO: allow this??
                     return ''
-                
+
                 x,y = eventd['mouse']
                 pts = common_utilities.ray_cast_path(eventd['context'], self.obj, [(x,y)])
                 if not pts:
@@ -1289,14 +1280,14 @@ class PolystripsUI:
                     self.sel_gedge.zip_to(ge)
                     return ''
                 return ''
-            
+
             if eventd['press'] == 'G':
                 if not self.sel_gedge.is_zippered():
                     self.create_undo_snapshot('grab')
                     self.ready_tool(eventd, self.grab_tool_gedge)
                     return 'grab tool'
                 return ''
-            
+
             if eventd['press'] == 'A':
                 self.sel_gvert = self.sel_gedge.gvert0
                 self.sel_gedge = None
@@ -1305,19 +1296,18 @@ class PolystripsUI:
                 self.sel_gvert = self.sel_gedge.gvert3
                 self.sel_gedge = None
                 return ''
-            
+
             if eventd['press'] == 'CTRL+R' and not self.sel_gedge.is_zippered():
                 self.create_undo_snapshot('rib')
                 self.sel_gedge = self.polystrips.rip_gedge(self.sel_gedge)
                 self.ready_tool(eventd, self.grab_tool_gedge)
                 return 'grab tool'
-        
-        
+
         ###################################
         # selected gvert commands
-        
+
         if self.sel_gvert:
-            
+
             if eventd['press'] == 'K':
                 if not self.sel_gvert.is_endpoint():
                     print('Selected GVert must be endpoint (exactly one GEdge)')
@@ -1334,7 +1324,7 @@ class PolystripsUI:
                     self.polystrips.split_gedge_at_t(ge, t, connect_gvert=self.sel_gvert)
                     return ''
                 return ''
-            
+
             if eventd['press'] == 'X':
                 if self.sel_gvert.is_inner():
                     return ''
@@ -1343,7 +1333,7 @@ class PolystripsUI:
                 self.sel_gvert = None
                 self.polystrips.remove_unconnected_gverts()
                 return ''
-            
+
             if eventd['press'] == 'CTRL+D':
                 self.create_undo_snapshot('dissolve')
                 self.polystrips.dissolve_gvert(self.sel_gvert)
@@ -1351,51 +1341,48 @@ class PolystripsUI:
                 self.polystrips.remove_unconnected_gverts()
                 self.polystrips.update_visibility(eventd['r3d'])
                 return ''
-            
+
             if eventd['press'] == 'S':
                 self.create_undo_snapshot('scale')
                 self.ready_tool(eventd, self.scale_tool_gvert_radius)
                 return 'scale tool'
-            
-            
+
             if eventd['press'] == 'CTRL+G':
                 self.create_undo_snapshot('grab')
                 self.ready_tool(eventd, self.grab_tool_gvert)
                 return 'grab tool'
-            
+
             if eventd['press'] == 'G':
                 self.create_undo_snapshot('grab')
                 self.ready_tool(eventd, self.grab_tool_gvert_neighbors)
                 return 'grab tool'
-            
-            
+
             if eventd['press'] == 'CTRL+C':
                 self.create_undo_snapshot('toggle')
                 self.sel_gvert.toggle_corner()
                 self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
                 return ''
-            
-            
+
             if eventd['press'] == 'CTRL+S':
                 self.create_undo_snapshot('scale')
                 self.ready_tool(eventd, self.scale_tool_gvert)
                 return 'scale tool'
-            
+
             if eventd['press'] == 'C':
                 self.create_undo_snapshot('smooth')
                 self.sel_gvert.smooth()
                 self.sel_gvert.update_visibility(eventd['r3d'], update_gedges=True)
                 return ''
-            
+
             if eventd['press'] == 'R':
                 self.create_undo_snapshot('rotate')
                 self.ready_tool(eventd, self.rotate_tool_gvert_neighbors)
                 return 'rotate tool'
-            
+
             if eventd['press'] == 'U':
                 self.sel_gvert.update_gedges()
                 return ''
-            
+
             if eventd['press'] == 'CTRL+R':
                 # self.polystrips.rip_gvert(self.sel_gvert)
                 # self.sel_gvert = None
@@ -1412,7 +1399,7 @@ class PolystripsUI:
                     self.ready_tool(eventd, self.grab_tool_gvert_neighbors)
                     return 'grab tool'
                 return ''
-            
+  
             if eventd['press'] == 'M':
                 if self.sel_gvert.is_inner(): return ''
                 x,y = eventd['mouse']
@@ -1434,12 +1421,11 @@ class PolystripsUI:
                     self.sel_gvert = gv
                     return ''
                 return ''
-                
-            
+
             if self.sel_gvert.zip_over_gedge:
                 gvthis = self.sel_gvert
                 gvthat = self.sel_gvert.get_zip_pair()
-                
+
                 if eventd['press'] == 'CTRL+NUMPAD_PLUS':
                     self.create_undo_snapshot('zip count')
                     max_t = 1 if gvthis.zip_t>gvthat.zip_t else gvthat.zip_t-0.05
@@ -1447,7 +1433,7 @@ class PolystripsUI:
                     gvthis.zip_over_gedge.update()
                     dprint('+ %f %f' % (min(gvthis.zip_t, gvthat.zip_t),max(gvthis.zip_t, gvthat.zip_t)), l=4)
                     return ''
-                
+
                 if eventd['press'] == 'CTRL+NUMPAD_MINUS':
                     self.create_undo_snapshot('zip count')
                     min_t = 0 if gvthis.zip_t<gvthat.zip_t else gvthat.zip_t+0.05
@@ -1455,9 +1441,9 @@ class PolystripsUI:
                     gvthis.zip_over_gedge.update()
                     dprint('- %f %f' % (min(gvthis.zip_t, gvthat.zip_t),max(gvthis.zip_t, gvthat.zip_t)), l=4)
                     return ''
-                
+
         return ''
-    
+
     def modal_sketching(self, eventd):
         #my_str = eventd['type'] + ' ' + str(round(eventd['pressure'],2)) + ' ' + str(round(self.stroke_radius_pressure,2))
         #print(my_str)
@@ -1465,37 +1451,36 @@ class PolystripsUI:
             x,y = eventd['mouse']
             p = eventd['pressure']
             r = eventd['mradius']
-            
+
             stroke_point = self.sketch[-1]
-            
+
             (lx, ly) = stroke_point[0]
             lr = stroke_point[1]
             self.sketch_curpos = (x,y)
             self.sketch_pressure = p
 
             ss0,ss1 = self.stroke_smoothing,1-self.stroke_smoothing
-            #smooth radii
+            # Smooth radii
             self.stroke_radius_pressure = lr*ss0 + r*ss1
-            
+
             self.sketch += [((lx*ss0+x*ss1, ly*ss0+y*ss1), self.stroke_radius_pressure)]
-            
-            
+
             return ''
-        
+
         if eventd['release'] in {'LEFTMOUSE','SHIFT+LEFTMOUSE'}:
-            #correct for 0 pressure on release
+            # correct for 0 pressure on release
             if self.sketch[-1][1] == 0:
                 self.sketch[-1] = self.sketch[-2]
-                
+
             p3d = common_utilities.ray_cast_stroke(eventd['context'], self.obj, self.sketch) if len(self.sketch) > 1 else []
             if len(p3d) <= 1: return 'main'
-            
+
             # tessellate stroke (if needed) so we have good stroke sampling
-            #TODO, tesselate pressure/radius values?
-            #length_tess = self.length_scale / 700
-            #p3d = [(p0+(p1-p0).normalized()*x) for p0,p1 in zip(p3d[:-1],p3d[1:]) for x in frange(0,(p0-p1).length,length_tess)] + [p3d[-1]]
-            #stroke = [(p,self.stroke_radius) for i,p in enumerate(p3d)]
-            
+            # TODO, tesselate pressure/radius values?
+            # length_tess = self.length_scale / 700
+            # p3d = [(p0+(p1-p0).normalized()*x) for p0,p1 in zip(p3d[:-1],p3d[1:]) for x in frange(0,(p0-p1).length,length_tess)] + [p3d[-1]]
+            # stroke = [(p,self.stroke_radius) for i,p in enumerate(p3d)]
+
             stroke = p3d
             self.sketch = []
             dprint('')
@@ -1505,69 +1490,68 @@ class PolystripsUI:
             self.polystrips.remove_unconnected_gverts()
             self.polystrips.update_visibility(eventd['r3d'])
             return 'main'
-        
+
         return ''
-    
-    
+
     ##############################
     # modal tool functions
-    
+
     def modal_scale_tool(self, eventd):
         cx,cy = self.action_center
         mx,my = eventd['mouse']
         ar = self.action_radius
         pr = self.mode_radius
         cr = math.sqrt((mx-cx)**2 + (my-cy)**2)
-        
+
         if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
             return 'main'
-        
+
         if eventd['press'] in {'ESC', 'RIGHTMOUSE'}:
             self.tool_fn('undo', eventd)
             return 'main'
-        
+
         if eventd['type'] == 'MOUSEMOVE':
             self.tool_fn(cr / pr, eventd)
             self.mode_radius = cr
             return ''
-        
+
         return ''
-    
+
     def modal_grab_tool(self, eventd):
         cx,cy = self.action_center
         mx,my = eventd['mouse']
         px,py = self.prev_pos #mode_pos
         sx,sy = self.mode_start
-        
+
         if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE','SHIFT+RET','SHIFT+NUMPAD_ENTER','SHIFT+LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
             return 'main'
-        
+
         if eventd['press'] in {'ESC','RIGHTMOUSE'}:
             self.tool_fn('undo', eventd)
             return 'main'
-        
+
         if eventd['type'] == 'MOUSEMOVE':
             self.tool_fn((mx-px,my-py), eventd)
             self.prev_pos = (mx,my)
             return ''
-        
+
         return ''
-    
+
     def modal_rotate_tool(self, eventd):
         cx,cy = self.action_center
         mx,my = eventd['mouse']
         px,py = self.prev_pos #mode_pos
-        
+
         if eventd['press'] in {'RET', 'NUMPAD_ENTER', 'LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
             return 'main'
-        
+
         if eventd['press'] in {'ESC', 'RIGHTMOUSE'}:
             self.tool_fn('undo', eventd)
             return 'main'
-        
+
         if eventd['type'] == 'MOUSEMOVE':
             vp = Vector((px-cx,py-cy,0))
             vm = Vector((mx-cx,my-cy,0))
@@ -1576,9 +1560,9 @@ class PolystripsUI:
             self.tool_fn(self.tool_rot, eventd)
             self.prev_pos = (mx,my)
             return ''
-        
+
         return ''
-    
+
     def modal_scale_brush_pixel_tool(self, eventd):
         '''
         This is the pixel brush radius
@@ -1589,68 +1573,66 @@ class PolystripsUI:
         if eventd['press'] in {'RET','NUMPAD_ENTER','LEFTMOUSE'}:
             self.tool_fn('commit', eventd)
             return 'main'
-        
+
         if eventd['press'] in {'ESC', 'RIGHTMOUSE'}:
             self.tool_fn('undo', eventd)
-            
+
             return 'main'
-        
+
         if eventd['type'] == 'MOUSEMOVE':
             '''
             '''
             self.tool_fn((mx,my), eventd)
-            
+
             return ''
-        
+
         return ''
-    
-    
+
     ###########################
     # main modal function (FSM)
-    
+
     def modal(self, context, event):
         context.area.tag_redraw()
         settings = common_utilities.get_settings()
-        
+
         eventd = self.get_event_details(context, event)
-        
+
         if self.footer_last != self.footer:
             context.area.header_text_set('PolyStrips: %s' % self.footer)
             self.footer_last = self.footer
-        
+
         FSM = {}
-        FSM['main']         = self.modal_main
-        FSM['nav']          = self.modal_nav
-        FSM['sketch']       = self.modal_sketching
-        FSM['scale tool']   = self.modal_scale_tool
-        FSM['grab tool']    = self.modal_grab_tool
-        FSM['rotate tool']  = self.modal_rotate_tool
+        FSM['main'] = self.modal_main
+        FSM['nav'] = self.modal_nav
+        FSM['sketch'] = self.modal_sketching
+        FSM['scale tool'] = self.modal_scale_tool
+        FSM['grab tool'] = self.modal_grab_tool
+        FSM['rotate tool'] = self.modal_rotate_tool
         FSM['brush scale tool'] = self.modal_scale_brush_pixel_tool
-        
+
         self.cur_pos = eventd['mouse']
         nmode = FSM[self.mode](eventd)
         self.mode_pos = eventd['mouse']
-        
+
         self.is_navigating = (nmode == 'nav')
         if nmode == 'nav': return {'PASS_THROUGH'}
-        
+
         if nmode in {'finish','cancel'}:
             self.kill_timer(context)
             polystrips_undo_cache = []
             return {'FINISHED'} if nmode == 'finish' else {'CANCELLED'}
-        
+
         if nmode: self.mode = nmode
-        
+
         return {'RUNNING_MODAL'}
-    
-    
+
     ###########################################################
     # functions to convert beziers and gpencils to polystrips
-    
+
     def create_polystrips_from_bezier(self, ob_bezier):
         data  = ob_bezier.data
         mx    = ob_bezier.matrix_world
-        
+
         def create_gvert(self, mx, co, radius):
             p0  = mx * co
             r0  = radius
@@ -1658,7 +1640,7 @@ class PolystripsUI:
             tx0 = Vector((1,0,0))
             ty0 = Vector((0,1,0))
             return GVert(self.obj,p0,r0,n0,tx0,ty0)
-        
+
         for spline in data.splines:
             pregv = None
             for bp0,bp1 in zip(spline.bezier_points[:-1],spline.bezier_points[1:]):
@@ -1666,77 +1648,74 @@ class PolystripsUI:
                 gv1 = self.create_gvert(mx, bp0.handle_right, 0.2)
                 gv2 = self.create_gvert(mx, bp1.handle_left, 0.2)
                 gv3 = self.create_gvert(mx, bp1.co, 0.2)
-                
+
                 ge0 = GEdge(self.obj, gv0, gv1, gv2, gv3)
                 ge0.recalc_igverts_approx()
                 ge0.snap_igverts_to_object()
-                
+
                 if pregv:
                     self.polystrips.gverts += [gv1,gv2,gv3]
                 else:
                     self.polystrips.gverts += [gv0,gv1,gv2,gv3]
                 self.polystrips.gedges += [ge0]
                 pregv = gv3
-    
+
     def create_polystrips_from_greasepencil(self):
         Mx = self.obj.matrix_world
         gp = self.obj.grease_pencil
         gp_layers = gp.layers
-        #for gpl in gp_layers: gpl.hide = True
+        # for gpl in gp_layers: gpl.hide = True
         strokes = [[(p.co,p.pressure) for p in stroke.points] for layer in gp_layers for frame in layer.frames for stroke in frame.strokes]
         self.strokes_original = strokes
-        
+
         #for stroke in strokes:
         #    self.polystrips.insert_gedge_from_stroke(stroke)
-    
-    
+
+
     ##########################
-    # general functions
-    
+    # General functions
+
     def kill_timer(self, context):
         if not self._timer: return
         context.window_manager.event_timer_remove(self._timer)
         self._timer = None
-    
+
     def get_event_details(self, context, event):
         '''
         Construct an event dict that is *slightly* more convenient than
         stringing together a bunch of logical conditions
         '''
-        
-        event_ctrl    = 'CTRL+'  if event.ctrl  else ''
-        event_shift   = 'SHIFT+' if event.shift else ''
-        event_alt     = 'ALT+'   if event.alt   else ''
-        event_oskey   = 'OSKEY+' if event.oskey else ''
-        event_ftype   = event_ctrl + event_shift + event_alt + event_oskey + event.type
-        
+
+        event_ctrl = 'CTRL+'  if event.ctrl  else ''
+        event_shift = 'SHIFT+' if event.shift else ''
+        event_alt = 'ALT+'   if event.alt   else ''
+        event_oskey = 'OSKEY+' if event.oskey else ''
+        event_ftype = event_ctrl + event_shift + event_alt + event_oskey + event.type
+
         event_pressure = 1 if not hasattr(event, 'pressure') else event.pressure
-        
+
         def pressure_to_radius(r, p, map = 3):
             if   map == 0:  p = max(0.25,p)
             elif map == 1:  p = 0.25 + .75 * p
             elif map == 2:  p = max(0.05,p)
             elif map == 3:  p = .7 * (2.25*p-1)/((2.25*p-1)**2 +1)**.5 + .55
             return r*p
-        
+
         return {
-            'context':  context,
-            'region':   context.region,
-            'r3d':      context.space_data.region_3d,
-            
-            'ctrl':     event.ctrl,
-            'shift':    event.shift,
-            'alt':      event.alt,
-            'value':    event.value,
-            'type':     event.type,
-            'ftype':    event_ftype,
-            'press':    event_ftype if event.value=='PRESS'   else None,
-            'release':  event_ftype if event.value=='RELEASE' else None,
-            
-            'mouse':    (float(event.mouse_region_x), float(event.mouse_region_y)),
+            'context': context,
+            'region': context.region,
+            'r3d': context.space_data.region_3d,
+
+            'ctrl': event.ctrl,
+            'shift': event.shift,
+            'alt': event.alt,
+            'value': event.value,
+            'type': event.type,
+            'ftype': event_ftype,
+            'press': event_ftype if event.value=='PRESS'   else None,
+            'release': event_ftype if event.value=='RELEASE' else None,
+
+            'mouse': (float(event.mouse_region_x), float(event.mouse_region_y)),
             'pressure': event_pressure,
-            'mradius':  pressure_to_radius(self.stroke_radius, event_pressure),
+            'mradius': pressure_to_radius(self.stroke_radius, event_pressure),
             }
-
-
-
