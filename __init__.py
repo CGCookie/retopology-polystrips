@@ -27,7 +27,7 @@ bl_info = {
     "blender":     (2, 7, 1),
     "location":    "View 3D > Tool Shelf",
     "warning":     "",  # used for warning icon and text in addons panel
-    "wiki_url":    "http://cgcookiemarkets.com/blender/all-products/polystrips-retopology-tool/?view=docss",
+    "wiki_url":    "http://cgcookiemarkets.com/blender/all-products/polystrips-retopology-tool/?view=docs",
     "tracker_url": "https://github.com/CGCookie/retopology-polystrips/issues",
     "category":    "3D View"
     }
