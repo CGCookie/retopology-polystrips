@@ -53,11 +53,11 @@ from bpy_extras.view3d_utils import location_3d_to_region_2d, region_2d_to_vecto
 from mathutils import Vector, Matrix, Quaternion
 from mathutils.geometry import intersect_line_plane, intersect_point_line
 
-from lib import common_utilities
-from lib.common_utilities import get_object_length_scale, dprint, profiler, frange
-from lib.common_classes import SketchBrush
+from .lib import common_utilities
+from .lib.common_utilities import get_object_length_scale, dprint, profiler, frange
+from .lib.common_classes import SketchBrush
 
-from lib import common_drawing
+from .lib import common_drawing
 
 from polystrips import *
 import polystrips_utilities
