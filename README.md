@@ -1,7 +1,7 @@
 CG Cookie Polystrips Retopology Tool
 ==========
 
-## Discontinued
+## Discontinued :warning:
 Polystrips has been combined with Contours and is now offered as a part of RetopoFlow: https://cgcookiemarkets.com/all-products/retopoflow/
 
 This version is no longer maintained.
